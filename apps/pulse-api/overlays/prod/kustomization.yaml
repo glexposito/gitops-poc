@@ -8,10 +8,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ../../base
+- ../../base
 replicas:
-  - name: pulse-api
-    count: 3
+- count: 3
+  name: pulse-api
 images:
-  - name: ghcr.io/glexposito/pulse-api
-    digest: sha256:2ba7ac071457cade78a11b523380d0cadd6be103bf0400dc47baae3c10fa889b
+- digest: sha256:df7d268529fb9e6a74682ece00930e7c6f267098a6ea4e2e94cdc8a976ec2b1e
+  name: ghcr.io/glexposito/pulse-api
