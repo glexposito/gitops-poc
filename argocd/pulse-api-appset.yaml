@@ -1,11 +1,15 @@
 # One pulse-api Application per workload cluster (pulse-api-internal,
 # -stg, -prod), each tracking its own overlay's pinned image digest.
 #
-# Auto-synced like everything else. Promotion is still gated: pulse-api's
-# pipeline only commits a stage's new digest (apps/pulse-api/overlays/<stage>)
-# after the previous stage's e2e passed, then runs `argocd app sync` right
-# away (instead of waiting for the ~3 min poll), waits until Healthy, and
-# runs e2e (internal -> stg -> prod).
+# Manual sync only - unlike everything else, these are NOT auto-synced.
+# pulse-api's pipeline commits a stage's new digest
+# (apps/pulse-api/overlays/<stage>), then runs
+# `argocd app sync --revision <that commit>`, waits until Healthy, and runs
+# e2e before promoting to the next stage (internal -> stg -> prod).
+# Argo CD rejects `sync --revision` on auto-synced apps, and pinning the
+# revision guarantees the pipeline deploys exactly the commit it pushed.
+# Trade-off: no selfHeal - drift shows as OutOfSync but isn't reverted, and
+# manual commits to the overlays only go live on the next sync.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -37,7 +41,3 @@ spec:
       destination:
         server: '{{server}}'
         namespace: 'pulse-api'
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
