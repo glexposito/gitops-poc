@@ -1,217 +1,45 @@
 # k8s-keda-poc
 
-A tiny, throwaway PoC showing how to autoscale workers with KEDA, deployed
-via GitOps from a single Argo CD instance managing three workload clusters
-(internal/stg/prod) from its own dedicated management cluster — along with
-the namespace layout, labels, and per-namespace guardrails each workload
-cluster gets along the way. Anyone can clone this and spin up all four
-locally to poke around.
+A throwaway local GitOps playground: four k3s clusters in Docker, one Argo CD
+managing internal/stg/prod, KEDA autoscaling queue workers, and a pipeline
+promoting [pulse-api](https://github.com/glexposito/pulse-api) through the
+stages. KISS.
 
-## Design philosophy
-
-KISS — keep it simple, stupid!
-
-## What this shows
-
-Four independent single-node k3s clusters running as Docker containers:
-
-- **management** (`localhost:6447`) — runs only Argo CD, no workload namespaces
-- **internal** (`localhost:6444`)
-- **stg** (`localhost:6446`)
-- **prod** (`localhost:6445`)
-
-internal, stg, and prod each get the same namespace layout
-(`manifests/<cluster>/`). Those directories are bind-mounted into each
-container's `/var/lib/rancher/k3s/server/manifests/custom` (a subdirectory,
-so k3s can still write its own required manifests like
-`coredns.yaml`/`traefik.yaml` alongside ours), and k3s auto-applies
-everything under `server/manifests` recursively. `docker compose up -d`
-applies this baseline, installs Argo CD on management through the
-separately mounted `argocd/helmchart.yaml`, and - once all four clusters
-and Argo CD are healthy - the `argocd-bootstrap` service registers
-internal/stg/prod as managed clusters and starts GitOps deployment of KEDA
-and the workers. No script to run by hand.
-
-management is a dedicated platform cluster on purpose - see the comment on
-its service in `docker-compose.yaml` for why.
-
-This repo deploys two worker variants, `worker1` and `worker2` — same
-Kustomize base, same image, same everything except the `QUEUE_NAME` env var (and,
-once KEDA is added, their scaling rules) — both into a namespace called
-`core-workers` on each cluster. The namespace name doesn't carry a stage
-suffix: each cluster is already dedicated to one environment (silo model),
-so the cluster boundary is what tells `core-workers` on `internal` apart
-from `core-workers` on `prod` —
-namespace names aren't global, so reusing the same one across clusters is
-fine and avoids a redundant suffix.
-
-| Namespace      | Cluster    | Purpose                                                              |
-| -------------- | ---------- | -------------------------------------------------------------------- |
-| `core-workers` | internal   | Safe to break, catches issues before anything customer-facing        |
-| `core-workers` | stg        | Customer-facing canary gate for `core-workers` on prod               |
-| `core-workers` | prod       | Customer-facing, full production traffic                             |
-| `argocd`       | management | Fixed platform namespace — the only thing this cluster runs          |
+## TL;DR
 
 ```bash
-docker exec k3s-internal kubectl get ns -l environment=internal
-docker exec k3s-prod kubectl get ns -l stage=prod
+docker compose up -d      # first start takes a few minutes
 ```
 
-Every cluster's `core-workers` namespace also has its own `ResourceQuota`, a
-`LimitRange`, and a default-deny-except-same-namespace `NetworkPolicy` —
-defined per cluster in `manifests/<cluster>/01-policies.yaml`, so the exact
-same namespace name can carry a completely different quota on each cluster
-(they're separate API servers; nothing links them by name). KEDA scales each worker
-between 0 and a per-environment ceiling (`maxReplicaCount` in
-`apps/core-workers/overlays/<stage>/scaling.yaml`: `internal` 5, `stg` 10,
-`prod` 20), so the worst case per cluster is double that (both workers at
-their ceiling at once) — quotas are sized to hold that plus rollout
-headroom, graduated by environment: `internal` is smallest, `stg` is
-mid-sized, `prod` is largest.
+Argo CD: **https://localhost:9000** (`admin` / `123`). You only need Docker.
 
-## Prerequisites
+| Cluster    | API              | pulse-api        | Runs                                        |
+| ---------- | ---------------- | ---------------- | ------------------------------------------- |
+| management | `localhost:6447` |                  | Argo CD                                     |
+| internal   | `localhost:6444` | `localhost:8081` | core-workers (max 5), pulse-api (1 replica) |
+| stg        | `localhost:6446` | `localhost:8082` | core-workers (max 10), pulse-api (2)        |
+| prod       | `localhost:6445` | `localhost:8083` | core-workers (max 20), pulse-api (3)        |
 
-- Docker + Docker Compose
-
-That's it — no `kubectl` needed on your host. Each k3s container ships its
-own `kubectl`, already pointed at itself, so you explore via `docker exec`
-instead of setting up a local kubeconfig.
-
-## Usage
+## Try it
 
 ```bash
-docker compose up -d             # starts clusters and Azurite; K3s installs Argo CD;
-                                  # argocd-bootstrap registers clusters and applies the root Application
+./scripts/queue-messages.sh add 100                      # KEDA scales the workers up
+docker exec k3s-prod kubectl -n core-workers get pods -w
+./scripts/queue-messages.sh remove 100                   # ...and back to zero
+
+curl localhost:8083/hostname                             # pulse-api on prod: which pod answered
+gh workflow run pipeline.yml -R glexposito/pulse-api     # promote pulse-api (needs the runner)
 ```
 
-That's the whole workflow - open https://localhost:9000 (`admin` / `123`) once
-Argo CD is up. Nothing else to run. See `argocd/helmchart.yaml` and the
-`argocd-bootstrap` service in `docker-compose.yaml` for how - both are
-commented inline.
-
-For a fresh install, inspect the Helm job if Argo CD does not become ready:
+## Tear down
 
 ```bash
-docker exec k3s-management kubectl -n kube-system get helmchart argocd
-docker exec k3s-management kubectl -n kube-system logs job/helm-install-argocd
+docker compose down       # keep state
+docker compose down -v    # wipe everything
 ```
 
-The `argocd/` directory holds the app-of-apps bootstrap:
+## Docs
 
-- `helmchart.yaml` — installed directly by K3s through the Compose file mount;
-  excluded from the root Application's scan.
-- `root-app.yaml` — applied once by `argocd-bootstrap`; the ApplicationSets
-  and AppProjects here are then picked up and synced automatically.
-- `clusters-appset.yaml` — one `Application` per cluster, syncing
-  `manifests/<cluster>/` (namespaces, quotas, RBAC, network policies) via
-  GitOps instead of k3s's own auto-deploy mount.
-- `keda-appset.yaml` — installs KEDA (the operator + CRDs behind
-  `core-workers`' autoscaling) via its official Helm chart, once per
-  workload cluster, since it's a cluster-scoped operator - management
-  never runs core-workers, so it has no need for KEDA.
-- `core-workers-appset.yaml` — one `ApplicationSet` with a matrix
-  generator crossing every stage with every worker, deploying
-  `apps/core-workers` (both `worker1` and `worker2`) into their shared
-  namespace on all three clusters — 6 Applications from one file. Each
-  worker gets a KEDA `ScaledObject` scaling on `core-workers-queue`'s
-  depth, with different messages-per-replica ratios and ceilings per
-  environment: `internal` 1 per 50 (max 5), `stg` 1 per 25 (max 10),
-  `prod` 1 per 10 (max 20) — all scale to zero when the queue's empty.
-- `projects/platform.yaml`, `projects/core-workers.yaml` — `AppProject`s
-  scoping what each Application is actually allowed to touch: `platform`
-  (the governance layer above) can create cluster-scoped resources like
-  `Namespace`; `core-workers` is restricted to only its own namespaces,
-  with no cluster-scoped access at all.
-
-All of these reference this repo's real remote
-(`https://github.com/glexposito/k8s-keda-poc.git`) as `repoURL`, so they
-sync as-is once Argo CD is running.
-
-`apps/core-workers` is a small, generic Kustomize app (not tied to any
-real app or company) — a `base/` with shared defaults and one
-`overlays/<stage>` per environment patching `APP_ENV` (`app_env.yaml`)
-and the KEDA scaling rules (`scaling.yaml`). The appset deploys each
-stage overlay twice, once per worker, adding a `-worker1`/`-worker2` name
-suffix and instance label. Every app follows
-[`docs/kustomize-conventions.md`](docs/kustomize-conventions.md) (fields before
-patches, single-purpose patches, CI-promoted images via `images:`). Render a
-stage locally to see what gets applied (minus that suffix):
-
-```bash
-kubectl kustomize apps/core-workers/overlays/prod
-```
-
-Then explore (pick the container for the cluster you want: `k3s-internal`,
-`k3s-stg`, `k3s-prod`, or `k3s-management`):
-
-```bash
-docker exec k3s-internal kubectl get ns --show-labels
-docker exec k3s-stg kubectl get ns --show-labels
-docker exec k3s-prod kubectl get ns --show-labels
-docker exec k3s-internal kubectl -n core-workers get pods -o wide
-docker exec k3s-internal kubectl -n core-workers get resourcequota,limitrange
-docker exec k3s-stg kubectl -n core-workers get resourcequota,limitrange
-docker exec k3s-prod kubectl -n core-workers get resourcequota,limitrange
-docker exec k3s-management kubectl -n argocd get pods                     # Argo CD components
-docker exec k3s-management kubectl -n argocd get secrets -l argocd.argoproj.io/secret-type=cluster  # managed clusters
-```
-
-### Queue messages
-
-Use the helper to change the queue depth while watching KEDA scale the workers:
-
-```bash
-./scripts/queue-messages.sh add 100      # append 100 demo messages
-./scripts/queue-messages.sh remove 95    # delete up to 95 visible messages
-./scripts/queue-messages.sh count        # show the approximate message count
-```
-
-The default queue is `core-workers-queue`, shared by both workers in all three
-clusters. The amount is how many messages to add or remove, not the desired
-final count. For example, removing 95 from 100 leaves 5 if nothing else changes
-the queue. Removal preserves the remaining messages and stops if no more
-visible messages are available; the count also includes invisible messages.
-
-The script uses the existing `queue-seed` Compose image and connection settings,
-so no Python or Azure CLI installation is needed on the host. Azurite must
-already be running (`docker compose up -d azurite`). `add` creates the queue if
-it does not exist. An optional final argument selects another queue, for example
-`./scripts/queue-messages.sh add 10 test-queue`. Run with `--help` for usage.
-
-On Windows, `scripts/queue-messages.ps1` is the same tool for PowerShell 7+
-(`pwsh`) - same subcommands, same output, same underlying `queue-seed` image:
-
-```powershell
-./scripts/queue-messages.ps1 add 100
-./scripts/queue-messages.ps1 remove 95
-./scripts/queue-messages.ps1 count
-```
-
-### pulse-api and the self-hosted runner
-
-[pulse-api](https://github.com/glexposito/pulse-api) is a second workload,
-deployed to its own `pulse-api` namespace on internal/stg/prod
-(`manifests/<cluster>/02-pulse-api.yaml`, `apps/pulse-api`,
-`argocd/pulse-api-appset.yaml`). Unlike everything else here, its
-Applications don't auto-sync: pulse-api's CI pipeline pins each stage's
-image digest in `apps/pulse-api/overlays/<stage>`, runs `argocd app sync`,
-and runs e2e checks before promoting to the next stage (internal → stg → prod).
-
-Those deploy jobs run on a self-hosted GitHub Actions runner, the
-`github-runner` Compose service. It joins `k8s-management`, so jobs reach
-Argo CD and each cluster's pulse-api NodePort (`k3s-<stage>:30080`) by
-hostname, and it only connects out to GitHub. Setting it up takes a
-one-hour registration token in `.env`; no PAT is involved. See
-[`docs/ci-setup.md`](docs/ci-setup.md) for the full setup, every credential
-involved, and troubleshooting. Without a registration it logs that and
-exits, so `docker compose up -d` works on any machine.
-
-### Tear down
-
-```bash
-docker compose down            # keep volumes (cluster state persists)
-docker compose down -v         # also wipe cluster state
-```
-
-If you rebuild just one remote cluster's volume (not the whole stack),
-re-register it with `docker compose up -d --force-recreate argocd-bootstrap`.
+- [architecture.md](docs/architecture.md): clusters, Argo CD, the two apps
+- [ci-setup.md](docs/ci-setup.md): pulse-api pipeline, runner, credentials
+- [kustomize-conventions.md](docs/kustomize-conventions.md): the Kustomize standard
