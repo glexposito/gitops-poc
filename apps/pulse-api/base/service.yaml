@@ -1,0 +1,16 @@
+# NodePort so the github-runner Compose service (same Docker network) can
+# reach each cluster's pulse-api at http://k3s-<stage>:30080 for the
+# pipeline's e2e checks - no ingress, no port-forward. Same port on every
+# cluster is fine: each is its own node.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-api
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: http
+      nodePort: 30080
+      protocol: TCP
+      name: http

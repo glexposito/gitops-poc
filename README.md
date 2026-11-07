@@ -185,6 +185,26 @@ On Windows, `scripts/queue-messages.ps1` is the same tool for PowerShell 7+
 ./scripts/queue-messages.ps1 count
 ```
 
+### pulse-api and the self-hosted runner
+
+[pulse-api](https://github.com/glexposito/pulse-api) is a second workload,
+deployed to its own `pulse-api` namespace on internal/stg/prod
+(`manifests/<cluster>/02-pulse-api.yaml`, `apps/pulse-api`,
+`argocd/pulse-api-appset.yaml`). Unlike everything else here, its
+Applications don't auto-sync: pulse-api's CI pipeline pins each stage's
+image digest in `apps/pulse-api/overlays/<stage>`, runs `argocd app sync`,
+and runs e2e checks before promoting to the next stage (internal → stg → prod).
+
+Those deploy jobs run on a self-hosted GitHub Actions runner, the
+`github-runner` Compose service. It joins `k8s-management`, so jobs reach
+Argo CD and each cluster's pulse-api NodePort (`k3s-<stage>:30080`) by
+hostname, and it only connects out to GitHub. To turn it on, copy
+`.env.example` to `.env` (gitignored) and set `GITHUB_PAT` - a fine-grained
+PAT with **Administration: Read and write** on `RUNNER_REPO` only. Then the
+usual `docker compose up -d` starts it too (`docker logs -f github-runner`,
+wait for "Listening for Jobs"). Without a PAT it logs that it's disabled
+and exits.
+
 ### Tear down
 
 ```bash

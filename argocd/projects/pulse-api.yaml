@@ -1,0 +1,30 @@
+# pulse-api: restricted to its own namespace on each workload cluster, no
+# cluster-scoped access - same model as projects/core-workers.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: pulse-api
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: pulse-api - owns the pulse-api namespace on each cluster only.
+  sourceRepos:
+    - https://github.com/glexposito/k8s-keda-poc.git
+  destinations:
+    - server: https://k3s-internal:6443
+      namespace: 'pulse-api'
+    - server: https://k3s-stg:6443
+      namespace: 'pulse-api'
+    - server: https://k3s-prod:6443
+      namespace: 'pulse-api'
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: ReplicaSet
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: Pod

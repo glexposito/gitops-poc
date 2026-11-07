@@ -1,0 +1,63 @@
+# pulse-api's namespace + guardrails on stg - same shape as core-workers'
+# (00-namespaces.yaml, 01-policies.yaml), kept in its own file since it's a
+# separate workload. Deployed by argocd/pulse-api-appset.yaml; the image
+# digest per stage is bumped by pulse-api's own CI pipeline.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pulse-api
+  labels:
+    environment: stg
+    stage: stg
+    cost-center: cc-2000
+    managed-by: k8s-keda-poc
+---
+# 2 replica(s) (apps/pulse-api/overlays/stg) + 1 surge pod during a rollout, with
+# headroom to spare - pulse-api is a tiny static Rust binary.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: pulse-api-quota
+  namespace: pulse-api
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 512Mi
+    limits.cpu: "1"
+    limits.memory: 1Gi
+    pods: "6"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: pulse-api
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 100m
+        memory: 64Mi
+      defaultRequest:
+        cpu: 10m
+        memory: 16Mi
+---
+# Unlike core-workers, pulse-api is an API: besides same-namespace
+# traffic, it accepts its HTTP port from anywhere, so the NodePort
+# (30080) is reachable - that's what the github-runner Compose service
+# hits for the pipeline's e2e checks.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace-and-http
+  namespace: pulse-api
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - ports:
+        - port: 8080
+          protocol: TCP

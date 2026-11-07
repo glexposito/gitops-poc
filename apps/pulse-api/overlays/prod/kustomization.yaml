@@ -1,0 +1,17 @@
+# pulse-api on prod: replica count and the image it runs.
+#
+# images: pins an exact digest, never a tag - starts on the image built
+# from glexposito/pulse-api@247711f (tag sha-247711f).
+# pulse-api's CI pipeline then replaces the digest: here (kustomize edit set
+# image) once the previous stage's e2e checks pass - don't hand-edit it
+# unless you mean to deploy (or roll back).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+replicas:
+  - name: pulse-api
+    count: 3
+images:
+  - name: ghcr.io/glexposito/pulse-api
+    digest: sha256:2ba7ac071457cade78a11b523380d0cadd6be103bf0400dc47baae3c10fa889b

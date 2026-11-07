@@ -1,2 +1,5 @@
 # Vendored Helm subchart archives - rebuilt via `helm dependency build`
 charts/*/charts/
+
+# Local secrets for the github-runner service (docker-compose.yaml)
+.env

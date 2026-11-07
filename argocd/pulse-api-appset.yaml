@@ -1,0 +1,41 @@
+# One pulse-api Application per workload cluster (pulse-api-internal,
+# -stg, -prod), each tracking its own overlay's pinned image digest.
+#
+# Deliberately NO automated sync, unlike every other appset here: the
+# promotion pipeline in glexposito/pulse-api owns deploys. Per stage it
+# commits the new digest to apps/pulse-api/overlays/<stage>, runs
+# `argocd app sync --revision <that commit>`, waits for Healthy, then runs
+# e2e before touching the next stage (internal -> stg -> prod). The
+# trade-off: no selfHeal - manual drift on the cluster shows as OutOfSync
+# until the next pipeline run (or a sync from the UI).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: pulse-api-appset
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - stage: internal
+            server: https://k3s-internal:6443
+          - stage: stg
+            server: https://k3s-stg:6443
+          - stage: prod
+            server: https://k3s-prod:6443
+  template:
+    metadata:
+      name: 'pulse-api-{{stage}}'
+      namespace: argocd
+      labels:
+        stage: '{{stage}}'
+        environment: '{{stage}}'
+    spec:
+      project: pulse-api
+      source:
+        repoURL: https://github.com/glexposito/k8s-keda-poc.git
+        targetRevision: HEAD
+        path: 'apps/pulse-api/overlays/{{stage}}'
+      destination:
+        server: '{{server}}'
+        namespace: 'pulse-api'
