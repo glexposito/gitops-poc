@@ -284,9 +284,11 @@ services:
   # (long-polls for jobs), so GitHub never has to reach this machine - but
   # jobs run here, on k8s-management, so they can hit Argo CD
   # (k3s-management:30090) and the workload clusters by hostname, same as
-  # argocd-bootstrap does. Registers itself with GITHUB_PAT/RUNNER_REPO from
-  # a gitignored .env (copy .env.example); with no PAT it just logs that
-  # it's disabled and exits, so `docker compose up -d` works anywhere.
+  # argocd-bootstrap does. Registers once with a one-hour RUNNER_TOKEN from
+  # a gitignored .env (copy .env.example) and keeps its runner credentials
+  # in the github-runner-state volume, so no long-lived token is stored.
+  # Unregistered and no token: it just logs that and exits, so
+  # `docker compose up -d` works anywhere.
   # Never point this at a public repo: fork PRs would run code here.
   # runner/Dockerfile: GitHub's official runner image + the argocd and
   # kustomize CLIs the deploy jobs use; runner/entrypoint.sh registers it.
@@ -298,7 +300,7 @@ services:
 
     environment:
       RUNNER_REPO: ${RUNNER_REPO:-}
-      GITHUB_PAT: ${GITHUB_PAT:-}
+      RUNNER_TOKEN: ${RUNNER_TOKEN:-}
       RUNNER_NAME: local-k8s-keda-poc
       RUNNER_LABELS: local-k8s
       # Inherited by every job, so workflows never carry Argo CD details.
@@ -306,6 +308,9 @@ services:
       # HTTPS NodePort, reached directly over k8s-management.
       ARGOCD_SERVER: k3s-management:30090
       ARGOCD_PASSWORD: "123"
+
+    volumes:
+      - github-runner-state:/runner-state
 
     networks:
       - k8s-management
@@ -320,6 +325,7 @@ volumes:
   prod-kubeconfig:
   management-kubeconfig:
   azurite-data:
+  github-runner-state:
 
 networks:
   k8s-management:

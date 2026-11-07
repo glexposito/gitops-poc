@@ -4,7 +4,8 @@
 # server version pinned in argocd/helmchart.yaml.
 #
 # The official image only ships the runner - it doesn't register itself -
-# so entrypoint.sh does that from GITHUB_PAT/RUNNER_REPO.
+# so entrypoint.sh does that (RUNNER_TOKEN/RUNNER_REPO) and keeps the
+# registration in /runner-state (the github-runner-state volume).
 FROM ghcr.io/actions/actions-runner:2.338.2
 
 ARG ARGOCD_VERSION=v3.5.2
@@ -17,6 +18,8 @@ RUN curl -fsSL -o /usr/local/bin/argocd \
     && curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
       | tar -xz -C /usr/local/bin kustomize
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
+# Owned by runner so the named volume mounted here starts writable.
+RUN mkdir /runner-state && chown runner /runner-state
 
 USER runner
 ENTRYPOINT ["/entrypoint.sh"]
