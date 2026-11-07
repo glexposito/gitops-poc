@@ -3,9 +3,9 @@
 #
 # Auto-synced like everything else. Promotion is still gated: pulse-api's
 # pipeline only commits a stage's new digest (apps/pulse-api/overlays/<stage>)
-# after the previous stage's e2e passed, then has Argo CD refresh right away
-# instead of waiting for its ~3 min poll, waits until that exact commit is
-# Synced + Healthy, and runs e2e (internal -> stg -> prod).
+# after the previous stage's e2e passed, then runs `argocd app sync` right
+# away (instead of waiting for the ~3 min poll), waits until Healthy, and
+# runs e2e (internal -> stg -> prod).
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:

@@ -61,5 +61,5 @@ when the queue is empty:
 ## pulse-api
 
 A Rust API (`apps/pulse-api`, 1/2/3 replicas). Its pipeline builds the image,
-then for each stage it pins the digest, waits for Argo CD to sync it, and runs e2e
+then for each stage it pins the digest, runs `argocd app sync`, and runs e2e
 before moving on. See [ci-setup.md](ci-setup.md).

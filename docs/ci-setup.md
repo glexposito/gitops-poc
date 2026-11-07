@@ -6,7 +6,7 @@
 2. For each stage (internal → stg → prod), the self-hosted `github-runner`
    (a Compose service) does three things:
    1. Commits the new digest to `apps/pulse-api/overlays/<stage>` here.
-   2. Has Argo CD refresh, then waits until that commit is Synced + Healthy.
+   2. Runs `argocd app sync` and waits for Healthy.
    3. Runs e2e against `http://k3s-<stage>:30080`. A failure stops the
       promotion.
 
@@ -82,5 +82,5 @@ docker compose rm -sf github-runner && docker volume rm k8s-keda-poc_github-runn
 | `not registered: set RUNNER_TOKEN` | Do setup step 3 |
 | Registration fails with 401 | The token is over 1 hour old. Get a new one. |
 | Pin image digest fails with 403 | `GITOPS_SSH_KEY` is missing. Do setup step 2. |
-| Wait for Argo CD: app not found | Push this repo, and wait for `argocd-bootstrap` to finish |
+| Sync fails: app not found | Push this repo, and wait for `argocd-bootstrap` to finish |
 | E2E: connection refused | `docker exec k3s-<stage> kubectl -n pulse-api get pods,svc` |
