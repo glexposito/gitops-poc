@@ -13,6 +13,8 @@ services:
 
     ports:
       - "6444:6443"
+      # pulse-api's NodePort (apps/pulse-api/base/service.yaml)
+      - "8081:30080"
 
     volumes:
       - internal-data:/var/lib/rancher/k3s
@@ -48,6 +50,8 @@ services:
 
     ports:
       - "6446:6443"
+      # pulse-api's NodePort (apps/pulse-api/base/service.yaml)
+      - "8082:30080"
 
     volumes:
       - stg-data:/var/lib/rancher/k3s
@@ -79,6 +83,8 @@ services:
 
     ports:
       - "6445:6443"
+      # pulse-api's NodePort (apps/pulse-api/base/service.yaml)
+      - "8083:30080"
 
     volumes:
       - prod-data:/var/lib/rancher/k3s
