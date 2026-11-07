@@ -34,6 +34,10 @@ spec:
     # Hash generated with:
     #   docker run --rm httpd:2.4-alpine htpasswd -nbBC 10 "" 123 | tr -d ':\n'
     configs:
+      # Argo CD's external URL - used in CLI output and notification links.
+      # The chart's default (from global.domain) is argocd.example.com.
+      cm:
+        url: https://localhost:9000
       secret:
         argocdServerAdminPassword: "$2a$10$zG/yvDMqlg9VStNvqCftBe3UVYc53FK5Gh47BWpeMuBl4vYQf3ini"
         argocdServerAdminPasswordMtime: "2024-01-01T00:00:00Z"
