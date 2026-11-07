@@ -13,5 +13,5 @@ replicas:
 - count: 3
   name: pulse-api
 images:
-- digest: sha256:eba3c28b7c216536262090219aca60682260ae9f94e6550a4df0c80de9e70d7e
+- digest: sha256:f89380760d6463fb21781b0dd724e4b178319bbbbb8b12d863b5aadd35a8caff
   name: ghcr.io/glexposito/pulse-api
