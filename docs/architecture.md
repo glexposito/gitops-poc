@@ -39,7 +39,7 @@ workload namespace gets its own ResourceQuota, LimitRange and NetworkPolicy
 | `clusters-appset.yaml`     | `manifests/<cluster>/` per cluster                       |
 | `keda-appset.yaml`         | KEDA operator per workload cluster                       |
 | `core-workers-appset.yaml` | Every stage × worker1/worker2 (6 Applications)           |
-| `pulse-api-appset.yaml`    | One per stage. **No auto-sync**: the pipeline syncs it.  |
+| `pulse-api-appset.yaml`    | One per stage; the pipeline commits each stage's digest  |
 | `projects/`                | AppProjects: workloads can only touch their own namespace |
 
 ## core-workers
@@ -61,5 +61,5 @@ when the queue is empty:
 ## pulse-api
 
 A Rust API (`apps/pulse-api`, 1/2/3 replicas). Its pipeline builds the image,
-then for each stage it pins the digest, runs `argocd app sync`, and runs e2e
+then for each stage it pins the digest, waits for Argo CD to sync it, and runs e2e
 before moving on. See [ci-setup.md](ci-setup.md).

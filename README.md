@@ -28,7 +28,6 @@ docker exec k3s-prod kubectl -n core-workers get pods -w
 ./scripts/queue-messages.sh remove 100                   # ...and back to zero
 
 curl localhost:8083/hostname                             # pulse-api on prod: which pod answered
-gh workflow run pipeline.yml -R glexposito/pulse-api     # promote pulse-api (needs the runner)
 ```
 
 ## Tear down
