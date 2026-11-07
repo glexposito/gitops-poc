@@ -200,14 +200,11 @@ and runs e2e checks before promoting to the next stage (internal → stg → pro
 Those deploy jobs run on a self-hosted GitHub Actions runner, the
 `github-runner` Compose service. It joins `k8s-management`, so jobs reach
 Argo CD and each cluster's pulse-api NodePort (`k3s-<stage>:30080`) by
-hostname, and it only connects out to GitHub. To turn it on, copy
-`.env.example` to `.env` (gitignored), set `RUNNER_TOKEN` to a one-hour
-registration token (the command is in `.env.example`), and run the usual
-`docker compose up -d` (`docker logs -f github-runner`, wait for "Listening
-for Jobs"). The runner keeps its registration in the `github-runner-state`
-volume, so the token is only needed once - no PAT or other long-lived token
-is stored. A new machine or `docker compose down -v` needs a fresh one.
-Without a registration or token, the runner logs that and exits.
+hostname, and it only connects out to GitHub. Setting it up takes a
+one-hour registration token in `.env`; no PAT is involved. See
+[`docs/ci-setup.md`](docs/ci-setup.md) for the full setup, every credential
+involved, and troubleshooting. Without a registration it logs that and
+exits, so `docker compose up -d` works on any machine.
 
 ### Tear down
 
