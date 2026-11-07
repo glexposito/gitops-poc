@@ -132,8 +132,10 @@ real app or company) — a `base/` with shared defaults and one
 `overlays/<stage>` per environment patching `APP_ENV` (`app_env.yaml`)
 and the KEDA scaling rules (`scaling.yaml`). The appset deploys each
 stage overlay twice, once per worker, adding a `-worker1`/`-worker2` name
-suffix and instance label. Render a stage locally to see what gets
-applied (minus that suffix):
+suffix and instance label. Every app follows
+[`docs/kustomize-conventions.md`](docs/kustomize-conventions.md) (fields before
+patches, single-purpose patches, CI-promoted images via `images:`). Render a
+stage locally to see what gets applied (minus that suffix):
 
 ```bash
 kubectl kustomize apps/core-workers/overlays/prod
