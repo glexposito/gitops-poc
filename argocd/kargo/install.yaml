@@ -1,0 +1,131 @@
+# Kargo and its two dependencies, all on the management cluster, installed
+# by Argo CD from their published Helm charts. Argo CD itself is installed by
+# k3s (cluster/argocd-install.yaml) because nothing exists yet to install it;
+# everything after that is GitOps.
+#
+# No ordering between these three: Kargo's chart needs cert-manager's CRDs
+# (it creates Issuers/Certificates), so on a fresh cluster the kargo
+# Application fails its first syncs and retries until cert-manager is up.
+#
+# ServerSideApply: these charts ship large CRDs, which overflow client-side
+# apply's last-applied-configuration annotation.
+---
+# Kargo's chart is only published as an OCI artifact on GHCR. Argo CD needs
+# the repo declared with enableOCI to pull Helm charts from it. Public, so
+# no credentials.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kargo-charts-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  name: kargo-charts
+  type: helm
+  url: ghcr.io/akuity/kargo-charts
+  enableOCI: "true"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  labels:
+    layer: promotion
+spec:
+  project: kargo
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.21.3
+    helm:
+      valuesObject:
+        crds:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+# Only the controller is used: it runs Kargo's verification AnalysisRuns
+# (kargo/pulse-api/e2e.yaml). pulse-api's Deployments stay Deployments - no
+# Rollout objects needed.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+  labels:
+    layer: promotion
+spec:
+  project: kargo
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.43.12 # Argo Rollouts v1.10.2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kargo
+  namespace: argocd
+  labels:
+    layer: promotion
+spec:
+  project: kargo
+  source:
+    repoURL: ghcr.io/akuity/kargo-charts
+    chart: kargo
+    targetRevision: 1.12.5
+    helm:
+      valuesObject:
+        api:
+          # PoC-only, same as Argo CD (cluster/argocd-install.yaml): fixed
+          # admin/123 login and a NodePort, so the UI is at
+          # https://localhost:9001 with nothing to run by hand. Kargo accepts
+          # a plain bcrypt hash, so this is Argo CD's hash of "123".
+          # Weak on purpose; this never leaves localhost.
+          adminAccount:
+            passwordHash: "$2a$10$zG/yvDMqlg9VStNvqCftBe3UVYc53FK5Gh47BWpeMuBl4vYQf3ini"
+            tokenSigningKey: "gitops-poc-not-a-secret-signing-key"
+          service:
+            type: NodePort
+            nodePort: 30091
+        # Inbound webhooks (e.g. GitHub telling a Warehouse about a new
+        # image) need this reachable from GitHub, which it isn't here -
+        # the Warehouse polls GHCR instead. Off to save resources.
+        externalWebhooksServer:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kargo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

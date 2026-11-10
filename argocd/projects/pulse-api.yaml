@@ -1,4 +1,5 @@
-# pulse-api: restricted to its own namespace on each workload cluster, no
+# pulse-api: restricted to its own namespaces on each workload cluster -
+# pulse-api (CI-promoted) and pulse-api-kargo (Kargo-promoted) - no
 # cluster-scoped access. A bad Application touching another namespace, or
 # creating a ClusterRole, is rejected by Argo CD before it reaches a cluster.
 apiVersion: argoproj.io/v1alpha1
@@ -9,16 +10,22 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: pulse-api - owns the pulse-api namespace on each cluster only.
+  description: pulse-api - owns the pulse-api and pulse-api-kargo namespaces on each cluster only.
   sourceRepos:
     - https://github.com/glexposito/gitops-poc.git
   destinations:
     - server: https://k3s-internal:6443
       namespace: 'pulse-api'
+    - server: https://k3s-internal:6443
+      namespace: 'pulse-api-kargo'
     - server: https://k3s-stg:6443
       namespace: 'pulse-api'
+    - server: https://k3s-stg:6443
+      namespace: 'pulse-api-kargo'
     - server: https://k3s-prod:6443
       namespace: 'pulse-api'
+    - server: https://k3s-prod:6443
+      namespace: 'pulse-api-kargo'
   clusterResourceWhitelist: []
   namespaceResourceWhitelist:
     - group: apps

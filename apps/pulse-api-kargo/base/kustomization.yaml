@@ -1,0 +1,10 @@
+# The Kargo copy of pulse-api: exactly apps/pulse-api/base, on a different
+# NodePort (30081) so it can run next to the CI-promoted copy (30080) on
+# the same clusters, in its own pulse-api-kargo namespace. Exists only to
+# compare the two promotion paths side by side.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../pulse-api/base
+patches:
+  - path: nodeport.yaml

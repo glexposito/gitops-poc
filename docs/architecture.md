@@ -3,7 +3,7 @@
 ## Clusters and bootstrap
 
 Four single-node k3s clusters in Docker (`cluster/docker-compose.yaml`):
-**management** runs only Argo CD, and **internal / stg / prod** are the
+**management** runs only the platform (Argo CD, and Kargo), and **internal / stg / prod** are the
 workload clusters, one per promotion stage. Keeping Argo CD on its own
 cluster means losing a workload cluster never takes down the thing that
 manages it.
@@ -34,6 +34,9 @@ There's no `kubectl` on the host. Each cluster ships its own:
 | `projects/`                     | AppProjects: what each team may deploy, and where       |
 | `appsets/cluster-manifests.yaml`| `manifests/<cluster>/` on every cluster, management too |
 | `appsets/pulse-api.yaml`        | pulse-api on every `role=workload` cluster              |
+| `appsets/pulse-api-kargo.yaml`  | The Kargo copy on every `role=workload` cluster         |
+| `kargo/install.yaml`            | cert-manager, Argo Rollouts, Kargo on management        |
+| `kargo/pulse-api.yaml`          | Syncs `kargo/pulse-api/` (the Kargo pipeline itself)    |
 
 The ApplicationSets use Argo CD's **clusters generator**: they select
 registered clusters by label instead of listing server URLs. The cluster
@@ -47,8 +50,11 @@ registered cluster can't receive a workload until its project allows it.
 
 | Namespace   | Clusters            | Notes                         |
 | ----------- | ------------------- | ----------------------------- |
-| `pulse-api` | internal, stg, prod | Promoted by pulse-api's pipeline |
-| `argocd`    | management          | The only thing management runs |
+| `pulse-api` | internal, stg, prod | Promoted by pulse-api's CI pipeline |
+| `pulse-api-kargo` | internal, stg, prod | Promoted by Kargo |
+| `argocd`    | management          | Argo CD |
+| `kargo`, `cert-manager`, `argo-rollouts` | management | Kargo and its dependencies |
+| `pulse-api` | management          | The Kargo Project: Warehouse, Stages, e2e Jobs |
 
 Each workload namespace gets its own ResourceQuota, LimitRange and
 NetworkPolicy (`manifests/<cluster>/00-pulse-api.yaml`), sized per stage.
@@ -61,3 +67,6 @@ once, then for each stage it commits the new digest to that stage's
 overlay, runs `argocd app sync` to that exact commit, and runs e2e before
 moving on. The pulse-api Applications have auto-sync off for that reason.
 See [ci-setup.md](ci-setup.md).
+
+Kargo promotes the same builds a second way, into `pulse-api-kargo`: see
+[kargo.md](kargo.md).

@@ -1,0 +1,87 @@
+# The promotion pipeline: internal -> stg -> prod.
+#
+# Each Stage runs the shared steps (promotion-task.yaml), then verification:
+# the Freight's own e2e image against that stage (e2e.yaml). Passing marks
+# the Freight verified in the stage, which is what makes it available to the
+# next one. The three Stages differ only in name, where their Freight comes
+# from, and the URL e2e hits. Auto-promotion is set per Stage in
+# project.yaml (internal, stg: auto; prod: manual).
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: internal
+  namespace: pulse-api
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: pulse-api
+      sources:
+        direct: true
+  promotionTemplate:
+    spec:
+      steps:
+        - task:
+            name: promote
+  verification:
+    analysisTemplates:
+      - name: pulse-api-e2e
+    args:
+      - name: base-url
+        value: http://k3s-internal:30081
+      - name: e2e-image
+        value: ghcr.io/glexposito/pulse-api-e2e@${{ imageFrom('ghcr.io/glexposito/pulse-api-e2e').Digest }}
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: stg
+  namespace: pulse-api
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: pulse-api
+      sources:
+        stages:
+          - internal
+  promotionTemplate:
+    spec:
+      steps:
+        - task:
+            name: promote
+  verification:
+    analysisTemplates:
+      - name: pulse-api-e2e
+    args:
+      - name: base-url
+        value: http://k3s-stg:30081
+      - name: e2e-image
+        value: ghcr.io/glexposito/pulse-api-e2e@${{ imageFrom('ghcr.io/glexposito/pulse-api-e2e').Digest }}
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: prod
+  namespace: pulse-api
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: pulse-api
+      sources:
+        stages:
+          - stg
+  promotionTemplate:
+    spec:
+      steps:
+        - task:
+            name: promote
+  verification:
+    analysisTemplates:
+      - name: pulse-api-e2e
+    args:
+      - name: base-url
+        value: http://k3s-prod:30081
+      - name: e2e-image
+        value: ghcr.io/glexposito/pulse-api-e2e@${{ imageFrom('ghcr.io/glexposito/pulse-api-e2e').Digest }}

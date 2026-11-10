@@ -1,0 +1,35 @@
+# kargo: the promotion layer on the management cluster - Kargo itself, the
+# two things it depends on (cert-manager for its webhook/API certs, Argo
+# Rollouts for running verification), and Kargo's own resources for
+# pulse-api (kargo/pulse-api/).
+#
+# Management-only: nothing in this project may touch a workload cluster.
+# Kargo reaches workloads only by updating git and asking Argo CD to sync
+# pulse-api-kargo-<stage> (argocd/appsets/pulse-api-kargo.yaml), which lives
+# in the pulse-api project.
+#
+# Cluster-scoped '*' because three operator charts install CRDs, cluster
+# RBAC and admission webhooks, and Kargo's Project is itself cluster-scoped.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: kargo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Kargo, cert-manager, Argo Rollouts and Kargo promotion config - management cluster only.
+  sourceRepos:
+    - https://github.com/glexposito/gitops-poc.git
+    - https://charts.jetstack.io
+    - https://argoproj.github.io/argo-helm
+    - ghcr.io/akuity/kargo-charts
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: '*'
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

@@ -1,0 +1,10 @@
+# 30081 instead of apps/pulse-api's 30080 - both copies share each node.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-api
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      nodePort: 30081

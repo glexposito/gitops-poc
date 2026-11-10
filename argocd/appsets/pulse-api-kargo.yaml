@@ -1,0 +1,46 @@
+# The Kargo-promoted copy of pulse-api: one Application per workload cluster
+# (pulse-api-kargo-internal, -stg, -prod), next to the CI-promoted
+# pulse-api-<stage> apps (pulse-api.yaml) so the two promotion paths can be
+# compared side by side. Own namespace (pulse-api-kargo) and NodePort
+# (30081).
+#
+# The authorized-stage annotation is what lets Kargo's Stage of the same
+# name in the pulse-api Kargo Project (kargo/pulse-api/stages.yaml) update
+# and sync this Application - without it Kargo refuses to touch it.
+#
+# Manual sync, like the CI copy: Kargo's argocd-update step syncs it to the
+# exact commit it pushed by setting targetRevision to that SHA.
+# ignoreApplicationDifferences keeps the ApplicationSet controller from
+# resetting that pin back to HEAD on its next reconcile.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: pulse-api-kargo
+  namespace: argocd
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            role: workload
+  ignoreApplicationDifferences:
+    - jsonPointers:
+        - /spec/source/targetRevision
+  template:
+    metadata:
+      name: 'pulse-api-kargo-{{name}}'
+      namespace: argocd
+      labels:
+        stage: '{{name}}'
+        environment: '{{name}}'
+      annotations:
+        kargo.akuity.io/authorized-stage: 'pulse-api:{{name}}'
+    spec:
+      project: pulse-api
+      source:
+        repoURL: https://github.com/glexposito/gitops-poc.git
+        targetRevision: HEAD
+        path: 'apps/pulse-api-kargo/overlays/{{name}}'
+      destination:
+        server: '{{server}}'
+        namespace: 'pulse-api-kargo'

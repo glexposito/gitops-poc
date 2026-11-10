@@ -1,0 +1,35 @@
+# Watches GHCR for new pulse-api builds. pulse-api's pipeline pushes two
+# images per commit with the same sha-<short> tag: the app, and its e2e test
+# image. A Freight is one matching pair, so a stage always verifies a build
+# with the tests from that same commit.
+#
+# NewestBuild: sha-* tags have no order of their own, so pick by build time.
+# It reads metadata for every matching tag, so discoveryLimit keeps that
+# small. The Warehouse polls; there is no inbound webhook (see
+# argocd/kargo/install.yaml).
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: pulse-api
+  namespace: pulse-api
+spec:
+  freightCreationPolicy: Automatic
+  subscriptions:
+    - image:
+        repoURL: ghcr.io/glexposito/pulse-api
+        imageSelectionStrategy: NewestBuild
+        allowTagsRegexes:
+          - ^sha-[0-9a-f]{7}$
+        discoveryLimit: 5
+    - image:
+        repoURL: ghcr.io/glexposito/pulse-api-e2e
+        imageSelectionStrategy: NewestBuild
+        allowTagsRegexes:
+          - ^sha-[0-9a-f]{7}$
+        discoveryLimit: 5
+  # Only create Freight when the app and its tests come from the same
+  # commit - not, say, a new app image paired with last build's tests while
+  # the second push is still in flight.
+  freightCreationCriteria:
+    expression: |
+      imageFrom('ghcr.io/glexposito/pulse-api').Tag == imageFrom('ghcr.io/glexposito/pulse-api-e2e').Tag

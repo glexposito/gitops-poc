@@ -1,0 +1,45 @@
+# How Kargo verifies a stage: Argo Rollouts' analysis runs this as a
+# Kubernetes Job in the pulse-api namespace on management. Exit code 0 means
+# the Freight is verified in that stage; anything else fails verification
+# and the next stage never offers it.
+#
+# The image is pulse-api's e2e test image from the same commit as the app
+# (pulse-api's Dockerfile.e2e, tag sha-<short>), passed in by each Stage
+# (stages.yaml) together with the URL to test. Today it wraps
+# scripts/e2e.sh; Playwright or `dotnet test` would just be a different
+# image - the contract is only "takes the base URL, exits 0 on success".
+#
+# The Job reaches k3s-<stage> through management's CoreDNS overrides
+# (manifests/management/05-cluster-dns.yaml), the same way Argo CD does.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: pulse-api-e2e
+  namespace: pulse-api
+spec:
+  args:
+    - name: base-url
+    - name: e2e-image
+  metrics:
+    - name: e2e
+      provider:
+        job:
+          spec:
+            # One attempt: a failing e2e is a failed verification, not
+            # something to retry until it passes.
+            backoffLimit: 0
+            ttlSecondsAfterFinished: 3600
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: e2e
+                    image: '{{args.e2e-image}}'
+                    args: ['{{args.base-url}}']
+                    resources:
+                      requests:
+                        cpu: 50m
+                        memory: 32Mi
+                      limits:
+                        cpu: 500m
+                        memory: 128Mi

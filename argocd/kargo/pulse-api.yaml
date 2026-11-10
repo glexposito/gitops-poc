@@ -1,0 +1,35 @@
+# Kargo's promotion pipeline for pulse-api (kargo/pulse-api/): the Project,
+# Warehouse, Stages and the e2e verification template. Kargo resources are
+# plain Kubernetes objects, so Argo CD syncs them like anything else.
+#
+# SkipDryRunOnMissingResource + retry: on a fresh cluster Kargo's CRDs don't
+# exist until argocd/kargo/install.yaml has synced, so the first attempts
+# fail until they do.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kargo-pulse-api
+  namespace: argocd
+  labels:
+    layer: promotion
+spec:
+  project: kargo
+  source:
+    repoURL: https://github.com/glexposito/gitops-poc.git
+    targetRevision: HEAD
+    path: kargo/pulse-api
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pulse-api
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

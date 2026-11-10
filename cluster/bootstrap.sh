@@ -50,6 +50,31 @@ stringData:
 EOF
 done
 
+# Kargo's git write credential (kargo/pulse-api/promotion-task.yaml pushes
+# digest commits to this repo). Secrets don't go in git, so it comes from a
+# gitignored file, cluster/secrets/kargo-git-key (see docs/kargo.md). It
+# lives in the Kargo Project's namespace, created here up front - labelled
+# so Kargo adopts it when Argo CD syncs the Project.
+echo "Preparing the pulse-api Kargo Project namespace..."
+management apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pulse-api
+  labels:
+    kargo.akuity.io/project: "true"
+EOF
+if [ -s /secrets/kargo-git-key ]; then
+  management -n pulse-api create secret generic gitops-poc-git \
+    --from-literal=repoURL=git@github.com:glexposito/gitops-poc.git \
+    --from-file=sshPrivateKey=/secrets/kargo-git-key \
+    --dry-run=client -o yaml \
+    | management label --local -f - kargo.akuity.io/cred-type=git -o yaml \
+    | management apply -f -
+else
+  echo "No cluster/secrets/kargo-git-key - Kargo can't push promotions until it exists (docs/kargo.md)."
+fi
+
 echo "Applying the root Application..."
 management apply -n argocd -f /argocd/root-app.yaml
 echo "Managed clusters: internal, stg, prod. Argo CD UI: https://localhost:9000 (admin/123)"

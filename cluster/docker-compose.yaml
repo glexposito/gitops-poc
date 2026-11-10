@@ -1,6 +1,7 @@
 # The local stand-in for real cluster infrastructure (what Terraform/
 # Terragrunt would provision): four k3s clusters, Argo CD on management,
-# the one-shot bootstrap, and the self-hosted GitHub runner.
+# the one-shot bootstrap, and the self-hosted GitHub runner. Kargo is not a
+# Compose service: Argo CD installs it on management (argocd/kargo/).
 #
 # Nothing in cluster/ is read by Argo CD - everything it syncs lives outside
 # this directory (argocd/, apps/, manifests/). Run from here:
@@ -33,6 +34,7 @@ services:
     ports:
       - "6444:6443"
       - "8081:30080"   # pulse-api NodePort (apps/pulse-api/base/service.yaml)
+      - "8091:30081"   # pulse-api-kargo NodePort (apps/pulse-api-kargo/base)
     volumes:
       - internal-data:/var/lib/rancher/k3s
       - internal-kubeconfig:/etc/rancher/k3s
@@ -51,6 +53,7 @@ services:
     ports:
       - "6446:6443"
       - "8082:30080"
+      - "8092:30081"
     volumes:
       - stg-data:/var/lib/rancher/k3s
       - stg-kubeconfig:/etc/rancher/k3s
@@ -67,6 +70,7 @@ services:
     ports:
       - "6445:6443"
       - "8083:30080"
+      - "8093:30081"
     volumes:
       - prod-data:/var/lib/rancher/k3s
       - prod-kubeconfig:/etc/rancher/k3s
@@ -85,6 +89,7 @@ services:
     ports:
       - "6447:6443"
       - "9000:30090"   # Argo CD UI (NodePort set in argocd-install.yaml)
+      - "9001:30091"   # Kargo UI (NodePort set in argocd/kargo/install.yaml)
     volumes:
       - management-data:/var/lib/rancher/k3s
       - management-kubeconfig:/etc/rancher/k3s
@@ -95,8 +100,8 @@ services:
       k8s-management:
         ipv4_address: 172.28.0.104
 
-  # One-shot (bootstrap.sh): registers internal/stg/prod with Argo CD and
-  # applies the root Application. Reuses the k3s image for its kubectl.
+  # One-shot (bootstrap.sh): registers internal/stg/prod with Argo CD,
+  # creates Kargo's git credential, and applies the root Application. Reuses the k3s image for its kubectl.
   # If one cluster's volume gets rebuilt, re-register it with
   #   docker compose up -d --force-recreate argocd-bootstrap
   argocd-bootstrap:
@@ -114,6 +119,8 @@ services:
       - management-kubeconfig:/kubeconfigs/management:ro
       - ./bootstrap.sh:/bootstrap.sh:ro
       - ../argocd/root-app.yaml:/argocd/root-app.yaml:ro
+      # Gitignored credentials (docs/kargo.md), e.g. Kargo's git write key.
+      - ./secrets:/secrets:ro
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
     networks:
       - k8s-management

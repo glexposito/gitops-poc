@@ -1,0 +1,15 @@
+# pulse-api (Kargo copy) on internal: replica count and the image it runs.
+#
+# images: pins an exact digest, never a tag. Kargo's promote task
+# (kargo/pulse-api/promotion-task.yaml) replaces it once the Freight is
+# available to internal - don't hand-edit it unless you mean to deploy.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../../base
+replicas:
+- count: 1
+  name: pulse-api
+images:
+- digest: sha256:3e4abc2bc52c2e5e1d12694294b42cc86a3e03aa6c9dcf4c62690a3e68debfc3
+  name: ghcr.io/glexposito/pulse-api
