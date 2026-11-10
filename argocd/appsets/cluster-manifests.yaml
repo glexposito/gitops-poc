@@ -1,0 +1,47 @@
+# One Application per cluster, each syncing that cluster's manifests/
+# directory (namespaces, quotas, RBAC, network policies) - the governance
+# layer, kept separate from the workloads. k3s also auto-applies the same
+# directory on start; from then on Argo CD owns it.
+#
+# Two generators:
+#   - clusters: every registered cluster with role=workload (labelled by
+#     cluster/bootstrap.sh). A new workload cluster gets its manifests the
+#     moment it's registered - as long as manifests/<name>/ exists.
+#   - list: management itself. It's the in-cluster destination Argo CD runs
+#     on, which has no cluster Secret to carry a label, so it's listed
+#     explicitly. Argo CD self-manages its own cluster the same way it
+#     manages every other one.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cluster-manifests
+  namespace: argocd
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            role: workload
+    - list:
+        elements:
+          - name: management
+            server: https://kubernetes.default.svc
+  template:
+    metadata:
+      name: 'manifests-{{name}}'
+      namespace: argocd
+      labels:
+        environment: '{{name}}'
+        layer: governance
+    spec:
+      project: platform
+      source:
+        repoURL: https://github.com/glexposito/gitops-poc.git
+        targetRevision: HEAD
+        path: 'manifests/{{name}}'
+      destination:
+        server: '{{server}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

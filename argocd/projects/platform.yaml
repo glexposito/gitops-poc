@@ -1,12 +1,11 @@
 # Platform-owned: namespace/quota/RBAC governance (manifests-internal,
 # manifests-stg, manifests-prod, manifests-management) - the layer with
-# cluster-scoped access, so it's kept separate from the core-workers
-# project, which gets none at all.
+# cluster-scoped access, so it's kept separate from workload projects like
+# pulse-api, which get none at all.
 #
-# sync-wave -1 so this (and the core-workers AppProject) get created
-# before clusters-appset.yaml / core-workers-appset.yaml try to generate
-# Applications that reference them - an Application referencing a project
-# that doesn't exist yet fails validation.
+# sync-wave -1 so the AppProjects get created before the ApplicationSets
+# (argocd/appsets/) generate Applications that reference them - an
+# Application referencing a project that doesn't exist yet fails validation.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -17,13 +16,9 @@ metadata:
 spec:
   description: >-
     Namespace/quota/RBAC governance and the app-of-apps bootstrap itself.
-    Not for the workload itself - see the core-workers project.
+    Not for workloads - see the pulse-api project.
   sourceRepos:
     - https://github.com/glexposito/gitops-poc.git
-    # KEDA's Helm chart (argocd/keda-appset.yaml) - a Helm repo, not git,
-    # since we're installing KEDA's own published chart rather than
-    # vendoring it into this repo.
-    - https://kedacore.github.io/charts
   destinations:
     - server: https://kubernetes.default.svc
       namespace: '*'
@@ -40,21 +35,6 @@ spec:
       kind: ClusterRole
     - group: rbac.authorization.k8s.io
       kind: ClusterRoleBinding
-    # All needed by KEDA's Helm chart: CRDs for ScaledObject/
-    # TriggerAuthentication/etc., an APIService registering KEDA's
-    # metrics adapter under external.metrics.k8s.io so the HPA that backs
-    # each ScaledObject can query it, and a ValidatingWebhookConfiguration
-    # KEDA uses to validate ScaledObjects/TriggerAuthentications on
-    # admission - confirmed by watching keda-prod's actual sync error
-    # (`resource admissionregistration.k8s.io:ValidatingWebhookConfiguration
-    # is not permitted in project platform`) rather than guessing the
-    # chart's full resource list upfront.
-    - group: apiextensions.k8s.io
-      kind: CustomResourceDefinition
-    - group: apiregistration.k8s.io
-      kind: APIService
-    - group: admissionregistration.k8s.io
-      kind: ValidatingWebhookConfiguration
   namespaceResourceWhitelist:
     - group: '*'
       kind: '*'

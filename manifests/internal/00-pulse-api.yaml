@@ -1,18 +1,17 @@
-# pulse-api's namespace + guardrails on stg - same shape as core-workers'
-# (00-namespaces.yaml, 01-policies.yaml), kept in its own file since it's a
-# separate workload. Deployed by argocd/pulse-api-appset.yaml; the image
-# digest per stage is bumped by pulse-api's own CI pipeline.
+# pulse-api's namespace + guardrails on this cluster. Deployed by
+# argocd/appsets/pulse-api.yaml; the image digest per stage is promoted
+# through apps/pulse-api/overlays/<stage>.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: pulse-api
   labels:
-    environment: stg
-    stage: stg
+    environment: internal
+    stage: internal
     cost-center: cc-2000
     managed-by: gitops-poc
 ---
-# 2 replica(s) (apps/pulse-api/overlays/stg) + 1 surge pod during a rollout, with
+# 1 replica(s) (apps/pulse-api/overlays/internal) + 1 surge pod during a rollout, with
 # headroom to spare - pulse-api is a tiny static Rust binary.
 apiVersion: v1
 kind: ResourceQuota
@@ -42,7 +41,7 @@ spec:
         cpu: 10m
         memory: 16Mi
 ---
-# Unlike core-workers, pulse-api is an API: besides same-namespace
+# pulse-api is an API: besides same-namespace
 # traffic, it accepts its HTTP port from anywhere, so the NodePort
 # (30080) is reachable - that's what the github-runner Compose service
 # hits for the pipeline's e2e checks.

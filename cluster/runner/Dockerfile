@@ -1,7 +1,7 @@
 # The github-runner Compose service's image: GitHub's official runner image
 # (built from github.com/actions/runner) plus the two CLIs pulse-api's
 # deploy jobs need, baked in so no job downloads them. argocd matches the
-# server version pinned in argocd/helmchart.yaml.
+# server version pinned in cluster/argocd-install.yaml.
 #
 # The official image only ships the runner - it doesn't register itself -
 # so entrypoint.sh does that (RUNNER_TOKEN/RUNNER_REPO) and keeps the

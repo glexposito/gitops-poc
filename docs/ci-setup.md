@@ -49,9 +49,9 @@ rm -rf "$d"
 **3. Runner** (once per machine):
 
 ```bash
-cp .env.example .env
+cd cluster && cp .env.example .env
 gh api -X POST repos/glexposito/pulse-api/actions/runners/registration-token --jq .token
-# paste it after RUNNER_TOKEN= in .env (valid for 1 hour)
+# paste it after RUNNER_TOKEN= in cluster/.env (valid for 1 hour)
 docker compose up -d --build
 docker logs -f github-runner   # wait for "Listening for Jobs", then clear RUNNER_TOKEN
 ```
@@ -71,7 +71,7 @@ gh run watch -R glexposito/pulse-api
 ```bash
 gh repo deploy-key delete <id> -R glexposito/gitops-poc        # ids: gh repo deploy-key list
 gh api -X DELETE repos/glexposito/pulse-api/actions/runners/<id> # ids: …/actions/runners
-docker compose rm -sf github-runner && docker volume rm gitops-poc_github-runner-state
+cd cluster && docker compose rm -sf github-runner && docker volume rm gitops-poc_github-runner-state
 ```
 
 ## Troubleshooting

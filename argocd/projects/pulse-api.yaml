@@ -1,5 +1,6 @@
 # pulse-api: restricted to its own namespace on each workload cluster, no
-# cluster-scoped access - same model as projects/core-workers.yaml.
+# cluster-scoped access. A bad Application touching another namespace, or
+# creating a ClusterRole, is rejected by Argo CD before it reaches a cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:

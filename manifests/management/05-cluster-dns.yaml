@@ -4,9 +4,9 @@
 # (which resolves these from a container's own shell) doesn't reach
 # inside a pod's separate network namespace, so CoreDNS needs its own
 # mapping. This can be plain, git-committed YAML because every hostname
-# below has a fixed IP in docker-compose.yaml (internal: 172.28.0.101,
+# below has a fixed IP in cluster/docker-compose.yaml (internal: 172.28.0.101,
 # stg: 172.28.0.102, prod: 172.28.0.103) - nothing to discover at
-# runtime. No azurite entry here - this cluster never talks to it.
+# runtime.
 apiVersion: v1
 kind: ConfigMap
 metadata:

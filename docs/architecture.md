@@ -2,64 +2,62 @@
 
 ## Clusters and bootstrap
 
-Four single-node k3s clusters in Docker: **management** runs only Argo CD, and
-**internal / stg / prod** run the workloads. Keeping Argo CD on its own
+Four single-node k3s clusters in Docker (`cluster/docker-compose.yaml`):
+**management** runs only Argo CD, and **internal / stg / prod** are the
+workload clusters, one per promotion stage. Keeping Argo CD on its own
 cluster means losing a workload cluster never takes down the thing that
 manages it.
 
-`docker compose up -d` does everything, with no scripts:
+`cd cluster && docker compose up -d` does everything:
 
 1. Each k3s container auto-applies its `manifests/<cluster>/`, which is
-   bind-mounted in.
-2. k3s installs Argo CD on management from `argocd/helmchart.yaml`.
-3. `argocd-bootstrap` registers internal/stg/prod with Argo CD and applies
-   `argocd/root-app.yaml`. From then on, Argo CD manages everything from git.
+   bind-mounted in. On the workload clusters that includes the
+   `argocd-manager` ServiceAccount Argo CD will use.
+2. k3s installs Argo CD on management from `cluster/argocd-install.yaml`.
+3. `cluster/bootstrap.sh` (the `argocd-bootstrap` service) registers
+   internal/stg/prod with Argo CD, labelled `role=workload` and
+   `stage=<cluster>`, then applies `argocd/root-app.yaml`. From then on,
+   Argo CD manages everything from git.
+
+`cluster/` is the stand-in for real cluster infrastructure, and Argo CD never
+reads it. Everything Argo CD syncs lives in `argocd/`, `apps/` and
+`manifests/`.
 
 There's no `kubectl` on the host. Each cluster ships its own:
 `docker exec k3s-<cluster> kubectl …`.
 
-## Namespaces
-
-| Namespace      | Clusters           | Notes                                       |
-| -------------- | ------------------ | ------------------------------------------- |
-| `core-workers` | internal, stg, prod | KEDA-scaled queue workers                  |
-| `pulse-api`    | internal, stg, prod | Promoted by pulse-api's pipeline           |
-| `argocd`       | management         | The only thing management runs              |
-
-Names have no stage suffix, because each cluster is one environment. Each
-workload namespace gets its own ResourceQuota, LimitRange and NetworkPolicy
-(`manifests/<cluster>/`), sized per environment.
-
 ## Argo CD (`argocd/`)
 
-| File                       | What                                                     |
-| -------------------------- | -------------------------------------------------------- |
-| `helmchart.yaml`           | Argo CD itself, installed by k3s                         |
-| `root-app.yaml`            | App of apps: syncs everything else in `argocd/`          |
-| `clusters-appset.yaml`     | `manifests/<cluster>/` per cluster                       |
-| `keda-appset.yaml`         | KEDA operator per workload cluster                       |
-| `core-workers-appset.yaml` | Every stage × worker1/worker2 (6 Applications)           |
-| `pulse-api-appset.yaml`    | One per stage; the pipeline commits each stage's digest  |
-| `projects/`                | AppProjects: workloads can only touch their own namespace |
+| File                            | What                                                    |
+| ------------------------------- | ------------------------------------------------------- |
+| `root-app.yaml`                 | App of apps: syncs everything else in `argocd/`         |
+| `projects/`                     | AppProjects: what each team may deploy, and where       |
+| `appsets/cluster-manifests.yaml`| `manifests/<cluster>/` on every cluster, management too |
+| `appsets/pulse-api.yaml`        | pulse-api on every `role=workload` cluster              |
 
-## core-workers
+The ApplicationSets use Argo CD's **clusters generator**: they select
+registered clusters by label instead of listing server URLs. The cluster
+Secret's name (`internal`, `stg`, `prod`) picks the overlay and the
+`manifests/` directory. Adding a stage means registering a cluster plus
+adding its `manifests/<cluster>/` and `apps/pulse-api/overlays/<cluster>/`.
+The AppProjects still list allowed destinations explicitly, so a newly
+registered cluster can't receive a workload until its project allows it.
 
-Two identical workers (`apps/core-workers`, deployed twice with a name
-suffix). KEDA scales them on `core-workers-queue` depth, and they go to zero
-when the queue is empty:
+## Namespaces
 
-| Stage    | 1 replica per | Max |
-| -------- | ------------- | --- |
-| internal | 50 messages   | 5   |
-| stg      | 25 messages   | 10  |
-| prod     | 10 messages   | 20  |
+| Namespace   | Clusters            | Notes                         |
+| ----------- | ------------------- | ----------------------------- |
+| `pulse-api` | internal, stg, prod | Promoted by pulse-api's pipeline |
+| `argocd`    | management          | The only thing management runs |
 
-```bash
-./scripts/queue-messages.sh add 100   # also: remove <n>, count, --help
-```
+Each workload namespace gets its own ResourceQuota, LimitRange and
+NetworkPolicy (`manifests/<cluster>/00-pulse-api.yaml`), sized per stage.
 
-## pulse-api
+## Promotion (pulse-api)
 
-A Rust API (`apps/pulse-api`, 1/2/3 replicas). Its pipeline builds the image,
-then for each stage it pins the digest, runs `argocd app sync`, and runs e2e
-before moving on. See [ci-setup.md](ci-setup.md).
+A Rust API (`apps/pulse-api`, 1/2/3 replicas on internal/stg/prod). Every
+overlay pins an exact image digest. pulse-api's pipeline builds the image
+once, then for each stage it commits the new digest to that stage's
+overlay, runs `argocd app sync` to that exact commit, and runs e2e before
+moving on. The pulse-api Applications have auto-sync off for that reason.
+See [ci-setup.md](ci-setup.md).

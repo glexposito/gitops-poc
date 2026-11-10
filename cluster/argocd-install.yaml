@@ -1,7 +1,6 @@
-# +argocd:skip-file-rendering
-# K3s owns this installer through a dedicated Compose file mount. The root
-# Application excludes it; the skip directive also protects the first sync
-# before an existing root Application has picked up that exclusion.
+# Argo CD itself, installed by k3s on the management cluster: Compose
+# mounts this into k3s's auto-deploy manifests directory. It lives in
+# cluster/ because Argo CD doesn't manage its own install here.
 apiVersion: helm.cattle.io/v1
 kind: HelmChart
 metadata:

@@ -1,6 +1,11 @@
 # One pulse-api Application per workload cluster (pulse-api-internal,
 # -stg, -prod), each tracking its own overlay's pinned image digest.
 #
+# Clusters are selected by label (role=workload, set by
+# cluster/bootstrap.sh), not hard-coded: the cluster Secret's name is the
+# stage, and picks the overlay. Which clusters pulse-api may actually deploy
+# to is still gated by argocd/projects/pulse-api.yaml.
+#
 # Manual sync only - unlike everything else, these are NOT auto-synced.
 # pulse-api's pipeline commits a stage's new digest
 # (apps/pulse-api/overlays/<stage>), then runs
@@ -13,31 +18,27 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: pulse-api-appset
+  name: pulse-api
   namespace: argocd
 spec:
   generators:
-    - list:
-        elements:
-          - stage: internal
-            server: https://k3s-internal:6443
-          - stage: stg
-            server: https://k3s-stg:6443
-          - stage: prod
-            server: https://k3s-prod:6443
+    - clusters:
+        selector:
+          matchLabels:
+            role: workload
   template:
     metadata:
-      name: 'pulse-api-{{stage}}'
+      name: 'pulse-api-{{name}}'
       namespace: argocd
       labels:
-        stage: '{{stage}}'
-        environment: '{{stage}}'
+        stage: '{{name}}'
+        environment: '{{name}}'
     spec:
       project: pulse-api
       source:
         repoURL: https://github.com/glexposito/gitops-poc.git
         targetRevision: HEAD
-        path: 'apps/pulse-api/overlays/{{stage}}'
+        path: 'apps/pulse-api/overlays/{{name}}'
       destination:
         server: '{{server}}'
         namespace: 'pulse-api'
