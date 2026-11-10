@@ -100,21 +100,81 @@ kept.
 
 ## Setup (once)
 
-1. Kargo pushes promotions to this repo with a deploy key:
+Kargo needs two things before it can promote anything. Both are one-off.
 
-   ```bash
-   cd cluster
-   ssh-keygen -q -t ed25519 -N "" -f secrets/kargo-git-key -C "kargo"
-   gh repo deploy-key add secrets/kargo-git-key.pub -R glexposito/gitops-poc --allow-write -t "kargo"
-   rm secrets/kargo-git-key.pub
-   docker compose up -d --force-recreate argocd-bootstrap   # puts the key in the cluster
-   ```
+### 1. A git key, so Kargo can push promotions
 
-   `cluster/secrets/` is gitignored (apart from `.gitkeep`).
+Every promotion is a commit to this repo, so Kargo needs write access to it.
+It gets that from an SSH **deploy key**: a key pair whose public half GitHub
+accepts for this repo only, and whose private half Kargo holds. The private
+half never goes in git. It lives in `cluster/secrets/` (gitignored, apart from
+`.gitkeep`), and `cluster/bootstrap.sh` copies it into the cluster as a
+Secret in `kargo-shared-resources`, which every Kargo Project can use.
 
-2. The Warehouse reads GHCR without credentials, so both images must be
-   public: GitHub → Packages → `pulse-api-e2e` → Package settings → Change
-   visibility → Public (once; `pulse-api` already is).
+Without it, every promotion fails at its first step:
+
+```
+error cloning git@github.com:glexposito/gitops-poc.git ... Could not read from remote repository.
+```
+
+**a. Create the key pair** (from `cluster/`):
+
+```bash
+cd cluster
+ssh-keygen -q -t ed25519 -N "" -f secrets/kargo-git-key -C kargo
+```
+
+This writes `secrets/kargo-git-key` (private) and
+`secrets/kargo-git-key.pub` (public).
+
+**b. Give GitHub the public half**, with write access:
+
+```bash
+gh repo deploy-key add secrets/kargo-git-key.pub -R glexposito/gitops-poc --allow-write -t kargo
+```
+
+Or in the browser: <https://github.com/glexposito/gitops-poc/settings/keys/new>,
+title `kargo`, paste the output of `cat secrets/kargo-git-key.pub`, tick
+**Allow write access**, **Add key**.
+
+Then delete the public half; GitHub has it now:
+
+```bash
+rm secrets/kargo-git-key.pub
+```
+
+**c. Give Kargo the private half** by rerunning the bootstrap:
+
+```bash
+docker compose up -d --force-recreate argocd-bootstrap
+docker logs -f argocd-bootstrap      # Ctrl+C once it prints "Managed clusters: ..."
+```
+
+The log should say `Adding Kargo's shared git credential...` and must **not**
+say `No cluster/secrets/kargo-git-key`. To double-check:
+
+```bash
+docker exec k3s-management kubectl -n kargo-shared-resources get secret gitops-poc-git
+```
+
+**d. Retry anything that already failed.** Promotions that ran before the
+key existed stay failed. In the Kargo UI, click the truck icon (Promote) on
+**internal** and pick the newest Freight.
+
+On a new machine, or after `docker compose down -v`, only step **c** is
+needed again - as long as `secrets/kargo-git-key` is still there. Lost the
+file? Delete the old `kargo` key in the repo's Settings → Deploy keys and
+start again from **a**.
+
+### 2. Public images, so Kargo can see new builds
+
+The Warehouse reads GHCR without credentials, so both images must be public.
+`pulse-api` already is. GitHub creates new packages as private, so after
+pulse-api's first build pushes `pulse-api-e2e`: GitHub → your profile →
+**Packages** → `pulse-api-e2e` → **Package settings** → **Change visibility**
+→ **Public**. Once only.
+
+Without it, the Warehouse finds no matching pair and creates no Freight.
 
 ## Try it
 
@@ -140,10 +200,11 @@ curl localhost:8083/hostname
 
 | Symptom | Fix |
 |---|---|
-| No Freight | Both images need a matching `sha-*` tag, and `pulse-api-e2e` must be public on GHCR |
+| No Freight | Both images need a matching `sha-*` tag, and `pulse-api-e2e` must be public: [Setup step 2](#2-public-images-so-kargo-can-see-new-builds). Click **Refresh** on the Warehouse to check now instead of waiting 5 minutes. |
 | `kargo` app keeps retrying | Normal on a fresh cluster until cert-manager is up |
 | `kargo-shared` / `kargo-<project>` retrying | Normal until Kargo's and Rollouts' CRDs exist |
-| Promotion fails at `git-push` | The key is missing: do setup step 1. `docker exec k3s-management kubectl -n kargo-shared-resources get secret gitops-poc-git` |
+| Promotion fails at the first step: `error cloning ... Could not read from remote repository` | Kargo has no git key: [Setup step 1](#1-a-git-key-so-kargo-can-push-promotions), then retry the promotion |
+| Promotion fails at `git-push` (permission denied) | The deploy key was added without **Allow write access**: delete it and add it again with write access |
 | `argocd-update` not authorized | The Application needs `kargo.akuity.io/authorized-stage: <project>:<stage>` (`argocd/appsets/kargo-apps-workloads.yaml`) |
 | Verification fails | Read the Job's logs: Playwright's `list` output, one line per test |
 | Playwright Job OOMKilled | Raise memory in `kargo/shared/e2e-playwright.yaml` |

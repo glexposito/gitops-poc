@@ -23,7 +23,26 @@ docker compose up -d      # first start takes a few minutes
 ```
 
 Argo CD: **https://localhost:9000**, Kargo: **https://localhost:9001** (both
-`admin` / `123`). You only need Docker.
+`admin` / `123`, accept the self-signed certificate). You need Docker, and
+`gh` for the one-off setup.
+
+**First time only**, before Kargo can promote anything
+([details](docs/kargo.md#setup-once)):
+
+1. Give Kargo a git key:
+   ```bash
+   cd cluster
+   ssh-keygen -q -t ed25519 -N "" -f secrets/kargo-git-key -C kargo
+   gh repo deploy-key add secrets/kargo-git-key.pub -R glexposito/gitops-poc --allow-write -t kargo
+   rm secrets/kargo-git-key.pub
+   docker compose up -d --force-recreate argocd-bootstrap
+   ```
+2. Make the `pulse-api-e2e` package public on GitHub (Packages → pulse-api-e2e →
+   Package settings → Change visibility).
+
+Then push to pulse-api `main`: Kargo deploys the build to internal and stg,
+running its Playwright tests against each, and waits for you to Promote it to
+prod.
 
 | Cluster    | API              | pulse-api        | Runs                  |
 | ---------- | ---------------- | ---------------- | --------------------- |
