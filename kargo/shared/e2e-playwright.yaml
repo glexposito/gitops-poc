@@ -1,0 +1,53 @@
+# Verification for Playwright test images - same contract as e2e-basic.yaml
+# (base URL as argument and BASE_URL, exit 0 = verified), sized for a real
+# browser:
+#   - more memory and CPU: Chromium needs ~1Gi
+#   - /dev/shm as a memory-backed volume: the container default (64Mi) is
+#     too small and makes Chromium crash mid-test
+#   - a longer deadline: a UI suite takes minutes, not seconds
+#
+# Results go to the Job's logs (use Playwright's `list` reporter). There is
+# no artifact storage here, so HTML reports and traces aren't kept.
+apiVersion: argoproj.io/v1alpha1
+kind: ClusterAnalysisTemplate
+metadata:
+  name: e2e-playwright
+spec:
+  args:
+    - name: base-url
+    - name: e2e-image
+  metrics:
+    - name: e2e
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            activeDeadlineSeconds: 1200
+            ttlSecondsAfterFinished: 3600
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: e2e
+                    image: '{{args.e2e-image}}'
+                    args: ['{{args.base-url}}']
+                    env:
+                      - name: BASE_URL
+                        value: '{{args.base-url}}'
+                      - name: CI
+                        value: "true"
+                    resources:
+                      requests:
+                        cpu: 500m
+                        memory: 1Gi
+                      limits:
+                        cpu: "2"
+                        memory: 2Gi
+                    volumeMounts:
+                      - name: dshm
+                        mountPath: /dev/shm
+                volumes:
+                  - name: dshm
+                    emptyDir:
+                      medium: Memory
+                      sizeLimit: 1Gi

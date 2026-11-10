@@ -1,0 +1,60 @@
+# The promotion steps every app shares - defined once, cluster-wide, and
+# called by each app's Stages (kargo/chart/templates/stages.yaml) with the
+# app's own vars. The same job pulse-api's CI deploy.yml does, run by Kargo:
+#
+#   1. clone gitops-poc, pin the Freight's image digest in
+#      apps/<app>/overlays/<stage>, commit, push
+#   2. argocd-update: pin Argo CD app <app>-<stage> to exactly that commit
+#      and sync it (CI does the same with `argocd app sync --revision`)
+#
+# Changing this changes every app's promotion at once.
+#
+# Git uses the SSH URL; its credential lives in kargo-shared-resources
+# (cluster/bootstrap.sh), which every Kargo Project can use. argocd-update
+# must use the Application's own (HTTPS) repoURL exactly.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: ClusterPromotionTask
+metadata:
+  name: promote-kustomize-app
+spec:
+  vars:
+    - name: app    # required: apps/<app>/ and Argo CD apps <app>-<stage>
+    - name: image  # required: the image to pin, e.g. ghcr.io/glexposito/pulse-api
+    - name: gitRepo
+      value: git@github.com:glexposito/gitops-poc.git
+    - name: argocdRepo
+      value: https://github.com/glexposito/gitops-poc.git
+  steps:
+    - uses: git-clone
+      config:
+        repoURL: ${{ vars.gitRepo }}
+        checkout:
+          - branch: main
+            path: ./repo
+    - uses: kustomize-set-image
+      config:
+        path: ./repo/apps/${{ vars.app }}/overlays/${{ ctx.stage }}
+        images:
+          - image: ${{ vars.image }}
+            digest: ${{ imageFrom(vars.image).Digest }}
+    - uses: git-commit
+      config:
+        path: ./repo
+        message: "${{ vars.app }}: promote ${{ imageFrom(vars.image).Tag }} to ${{ ctx.stage }}"
+    - uses: git-push
+      as: push
+      config:
+        path: ./repo
+    - uses: argocd-update
+      config:
+        apps:
+          - name: ${{ vars.app }}-${{ ctx.stage }}
+            sources:
+              - repoURL: ${{ vars.argocdRepo }}
+                # The commit actually pushed (after any rebase onto a newer
+                # main), not the local one.
+                desiredRevision: ${{ task.outputs['push'].commit }}
+                # Pins the Application's targetRevision to that commit, so a
+                # later push to main (another app, or the CI path) can't be
+                # what gets synced and health-checked.
+                updateTargetRevision: true

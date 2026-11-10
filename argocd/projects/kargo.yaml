@@ -1,12 +1,12 @@
 # kargo: the promotion layer on the management cluster - Kargo itself, the
 # two things it depends on (cert-manager for its webhook/API certs, Argo
 # Rollouts for running verification), and Kargo's own resources for
-# pulse-api (kargo/pulse-api/).
+# every app (kargo/shared/, kargo/apps/ rendered by kargo/chart/).
 #
 # Management-only: nothing in this project may touch a workload cluster.
 # Kargo reaches workloads only by updating git and asking Argo CD to sync
-# pulse-api-kargo-<stage> (argocd/appsets/pulse-api-kargo.yaml), which lives
-# in the pulse-api project.
+# <app>-<stage> (argocd/appsets/kargo-apps-workloads.yaml), which belong
+# to each app's own AppProject (argocdProject in kargo/apps/<app>.yaml).
 #
 # Cluster-scoped '*' because three operator charts install CRDs, cluster
 # RBAC and admission webhooks, and Kargo's Project is itself cluster-scoped.

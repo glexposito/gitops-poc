@@ -1,6 +1,6 @@
 # pulse-api-kargo: the Kargo-promoted copy of pulse-api, side by side with
 # the CI-promoted one (00-pulse-api.yaml). Deployed by
-# argocd/appsets/pulse-api-kargo.yaml, promoted by Kargo.
+# argocd/appsets/kargo-apps-workloads.yaml, promoted by Kargo.
 apiVersion: v1
 kind: Namespace
 metadata:

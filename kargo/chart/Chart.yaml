@@ -1,0 +1,9 @@
+# Renders one app's Kargo pipeline (Project, Warehouse, Stages) from a short
+# values file, kargo/apps/<app>.yaml. One instance per app, created by
+# argocd/kargo/apps.yaml. The steps and test templates themselves are
+# shared, cluster-wide (kargo/shared/).
+apiVersion: v2
+name: kargo-app
+description: One app's Kargo promotion pipeline
+type: application
+version: 0.1.0

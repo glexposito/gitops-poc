@@ -11,7 +11,7 @@ compared side by side:
 | Overlays          | `apps/pulse-api/overlays/<stage>`       | `apps/pulse-api-kargo/overlays/<stage>`        |
 | Argo CD apps      | `pulse-api-<stage>`                     | `pulse-api-kargo-<stage>`                      |
 | Namespace / port  | `pulse-api`, `:30080` (host 8081-8083)  | `pulse-api-kargo`, `:30081` (host 8091-8093)   |
-| E2E               | `scripts/e2e.sh` on the runner          | The build's `pulse-api-e2e` image, as a Job    |
+| E2E               | `scripts/e2e.sh` on the runner          | The build's Playwright image (`pulse-api-e2e`), as a Job |
 | Prod gate         | Automatic once stg passes               | Manual: Promote in the Kargo UI                |
 
 Kargo UI: **https://localhost:9001** (`admin` / `123`).
@@ -26,17 +26,75 @@ Warehouse (polls GHCR) → Freight = that matching pair
 Stage internal ── promote → verify ──▶ Stage stg ── promote → verify ──▶ Stage prod (manual)
 ```
 
-| File (`kargo/pulse-api/`) | What                                                          |
-| ------------------------- | ------------------------------------------------------------- |
-| `project.yaml`            | Kargo Project + which Stages auto-promote (internal, stg)     |
-| `warehouse.yaml`          | Subscribes to both images; Freight only when their tags match |
-| `promotion-task.yaml`     | The steps: clone, `kustomize-set-image`, commit, push, `argocd-update` |
-| `stages.yaml`             | internal ← Warehouse, stg ← internal, prod ← stg              |
-| `e2e.yaml`                | AnalysisTemplate: runs the e2e image as a Job; exit 0 = verified |
-
 Kargo, cert-manager and Argo Rollouts are installed by Argo CD
 (`argocd/kargo/install.yaml`), not by Compose. Only Rollouts' analysis
-controller is used, for verification. pulse-api stays a plain Deployment.
+controller is used, for verification. Apps stay plain Deployments.
+
+## Layout: written once, one file per app
+
+```
+kargo/
+  shared/                        # every app uses these, cluster-wide
+    promote-kustomize-app.yaml   #   ClusterPromotionTask: set digest, commit, push, argocd-update
+    e2e-basic.yaml               #   ClusterAnalysisTemplate: small pod (bash/curl tests)
+    e2e-playwright.yaml          #   ClusterAnalysisTemplate: 1Gi+, /dev/shm, longer deadline
+  chart/                         # renders one app's Project, Warehouse, Stages
+  apps/
+    pulse-api.yaml               # the only per-app Kargo config
+```
+
+| Argo CD (`argocd/`)                 | Creates                                                   |
+| ----------------------------------- | --------------------------------------------------------- |
+| `kargo/shared.yaml`                 | `kargo/shared/` on management                             |
+| `kargo/apps.yaml`                   | `kargo-<project>`: one chart instance per app file        |
+| `appsets/kargo-apps-workloads.yaml` | `<app>-<stage>`: every app file × every workload cluster, with the `authorized-stage` annotation |
+
+The git credential is shared too: it lives in `kargo-shared-resources`,
+which every Kargo Project falls back to.
+
+## Adding an app
+
+1. Its manifests: `apps/<app>/base` + `overlays/<stage>` (needed anyway).
+2. Its namespace on each cluster: `manifests/<cluster>/` (needed anyway), and
+   allow it in the app's AppProject.
+3. Its CI pushes `<image>:sha-*` and `<image>-e2e:sha-*`.
+4. `kargo/apps/<app>.yaml`:
+
+```yaml
+project: orders                      # Kargo Project (namespace on management)
+app: orders-api                      # apps/<app>/, Argo CD apps <app>-<stage>, namespace
+argocdProject: orders
+image: ghcr.io/glexposito/orders-api
+e2eImage: ghcr.io/glexposito/orders-api-e2e
+port: 30082
+verification: [e2e-basic]
+```
+
+Every option and default: `kargo/chart/values.yaml`.
+
+## Choosing how an app is tested
+
+How the tests run is the e2e image's business: its entrypoint takes the
+base URL and exits 0 when everything passes. Bash, Playwright and `dotnet
+test` are all just different images. What the app file picks is the pod
+the image runs in:
+
+```yaml
+verification: [e2e-playwright]          # one list for every stage
+
+verification:                           # or per stage - all listed must pass
+  internal: [e2e-basic]
+  stg: [e2e-basic, e2e-playwright]
+  prod: [e2e-basic]                     # a stage left out isn't verified
+```
+
+A new kind of test (load tests, a Prometheus error-rate check) is a new
+template in `kargo/shared/`. An app with a one-off need can have its own
+AnalysisTemplate in its Project namespace instead.
+
+pulse-api uses `e2e-playwright`: its tests are in pulse-api's `e2e/`. Results
+are in the Job's logs. There's no artifact storage, so Playwright's HTML
+reports and traces aren't kept.
 
 ## Setup (once)
 
@@ -76,14 +134,8 @@ curl localhost:8093/hostname
 |---|---|
 | No Freight | Both images need a matching `sha-*` tag. Old builds have no `pulse-api-e2e` image, so push a new commit. `pulse-api-e2e` must be public on GHCR, or the Warehouse can't read it. |
 | `kargo` app keeps retrying | Normal on a fresh cluster until cert-manager is up |
-| Promotion fails at `git-push` | The key is missing: do the setup above. `docker exec k3s-management kubectl -n pulse-api get secret gitops-poc-git` |
-| `argocd-update` not authorized | The Application needs `kargo.akuity.io/authorized-stage: pulse-api:<stage>` (`argocd/appsets/pulse-api-kargo.yaml`) |
-| Verification fails | Read the Job's logs, same PASS/FAIL output as CI |
-
-## Changing the e2e tests
-
-The contract between Kargo and the tests is just "an image that takes the
-base URL as its argument and exits 0 on success". Today `pulse-api-e2e`
-wraps `scripts/e2e.sh`. Playwright or `dotnet test` would be a different
-`Dockerfile.e2e` in pulse-api, with no change here except maybe more
-memory in `e2e.yaml`.
+| `kargo-shared` / `kargo-<project>` retrying | Normal until Kargo's and Rollouts' CRDs exist |
+| Promotion fails at `git-push` | The key is missing: do the setup above. `docker exec k3s-management kubectl -n kargo-shared-resources get secret gitops-poc-git` |
+| `argocd-update` not authorized | The Application needs `kargo.akuity.io/authorized-stage: <project>:<stage>` (`argocd/appsets/kargo-apps-workloads.yaml`) |
+| Verification fails | Read the Job's logs: Playwright's `list` output, one line per test |
+| Playwright Job OOMKilled | Raise memory in `kargo/shared/e2e-playwright.yaml` |

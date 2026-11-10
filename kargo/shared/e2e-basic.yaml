@@ -1,21 +1,17 @@
-# How Kargo verifies a stage: Argo Rollouts' analysis runs this as a
-# Kubernetes Job in the pulse-api namespace on management. Exit code 0 means
-# the Freight is verified in that stage; anything else fails verification
-# and the next stage never offers it.
+# Verification for lightweight test images (bash/curl, API checks). Shared
+# by every app that picks it (verification: in kargo/apps/<app>.yaml).
 #
-# The image is pulse-api's e2e test image from the same commit as the app
-# (pulse-api's Dockerfile.e2e, tag sha-<short>), passed in by each Stage
-# (stages.yaml) together with the URL to test. Today it wraps
-# scripts/e2e.sh; Playwright or `dotnet test` would just be a different
-# image - the contract is only "takes the base URL, exits 0 on success".
+# The contract with an app's e2e image: it takes the base URL as its only
+# argument (also given as BASE_URL), and exits 0 when every check passes.
+# Argo Rollouts runs it as a Job in the app's Kargo Project namespace on
+# management; exit 0 marks the Freight verified in that stage.
 #
-# The Job reaches k3s-<stage> through management's CoreDNS overrides
+# Reaches k3s-<stage> through management's CoreDNS overrides
 # (manifests/management/05-cluster-dns.yaml), the same way Argo CD does.
 apiVersion: argoproj.io/v1alpha1
-kind: AnalysisTemplate
+kind: ClusterAnalysisTemplate
 metadata:
-  name: pulse-api-e2e
-  namespace: pulse-api
+  name: e2e-basic
 spec:
   args:
     - name: base-url
@@ -28,6 +24,7 @@ spec:
             # One attempt: a failing e2e is a failed verification, not
             # something to retry until it passes.
             backoffLimit: 0
+            activeDeadlineSeconds: 600
             ttlSecondsAfterFinished: 3600
             template:
               spec:
@@ -36,6 +33,9 @@ spec:
                   - name: e2e
                     image: '{{args.e2e-image}}'
                     args: ['{{args.base-url}}']
+                    env:
+                      - name: BASE_URL
+                        value: '{{args.base-url}}'
                     resources:
                       requests:
                         cpu: 50m

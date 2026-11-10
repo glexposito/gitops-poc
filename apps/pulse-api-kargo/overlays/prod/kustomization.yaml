@@ -1,7 +1,7 @@
 # pulse-api (Kargo copy) on prod: replica count and the image it runs.
 #
 # images: pins an exact digest, never a tag. Kargo's promote task
-# (kargo/pulse-api/promotion-task.yaml) replaces it once the Freight is
+# (kargo/shared/promote-kustomize-app.yaml) replaces it once the Freight is
 # available to prod - don't hand-edit it unless you mean to deploy.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization

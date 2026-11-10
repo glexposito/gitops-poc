@@ -1,0 +1,59 @@
+# The Argo CD side of every Kargo-promoted app: one Application per app per
+# workload cluster (<app>-<stage>), from the same kargo/apps/<app>.yaml files
+# that define each app's Kargo pipeline (argocd/kargo/apps.yaml). A matrix
+# generator crosses every app file with every role=workload cluster, so
+# adding an app needs no new ApplicationSet.
+#
+# The authorized-stage annotation lets that app's Kargo Stage of the same
+# name update and sync this Application - without it Kargo refuses to
+# touch it.
+#
+# Manual sync, like the CI-promoted apps: Kargo's argocd-update step syncs
+# each one to the exact commit it pushed by setting targetRevision to that
+# SHA. ignoreApplicationDifferences keeps this ApplicationSet from resetting
+# that pin back to HEAD on its next reconcile.
+#
+# Every app lands on every workload cluster: the app needs
+# apps/<app>/overlays/<cluster>, manifests/<cluster>/ for its namespace, and
+# its AppProject (argocdProject) must allow the destination.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kargo-apps-workloads
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://github.com/glexposito/gitops-poc.git
+              revision: HEAD
+              files:
+                - path: kargo/apps/*.yaml
+          - clusters:
+              selector:
+                matchLabels:
+                  role: workload
+  ignoreApplicationDifferences:
+    - jsonPointers:
+        - /spec/source/targetRevision
+  template:
+    metadata:
+      name: '{{ .app }}-{{ .name }}'
+      namespace: argocd
+      labels:
+        stage: '{{ .name }}'
+        environment: '{{ .name }}'
+      annotations:
+        kargo.akuity.io/authorized-stage: '{{ .project }}:{{ .name }}'
+    spec:
+      project: '{{ .argocdProject }}'
+      source:
+        repoURL: https://github.com/glexposito/gitops-poc.git
+        targetRevision: HEAD
+        path: 'apps/{{ .app }}/overlays/{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: '{{ .app }}'

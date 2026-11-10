@@ -1,0 +1,28 @@
+# Watches GHCR for new builds of the app and its e2e image. A Freight is one
+# matching pair (same sha-<short> tag), so a stage always verifies a build
+# with the tests from that same commit.
+#
+# NewestBuild: sha-* tags have no order of their own, so pick by build time.
+# It reads metadata for every matching tag, so discoveryLimit keeps that
+# small. The Warehouse polls (every 5m by default); there is no inbound
+# webhook (argocd/kargo/install.yaml).
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: {{ .Values.app }}
+  namespace: {{ .Values.project }}
+spec:
+  freightCreationPolicy: Automatic
+  subscriptions:
+    {{- range list (required "image is required" .Values.image) (required "e2eImage is required" .Values.e2eImage) }}
+    - image:
+        repoURL: {{ . }}
+        imageSelectionStrategy: NewestBuild
+        allowTagsRegexes:
+          - {{ $.Values.tagRegex | quote }}
+        discoveryLimit: 5
+    {{- end }}
+  # Only when both come from the same commit - not a new app image paired
+  # with the last build's tests while the second push is still in flight.
+  freightCreationCriteria:
+    expression: imageFrom('{{ .Values.image }}').Tag == imageFrom('{{ .Values.e2eImage }}').Tag

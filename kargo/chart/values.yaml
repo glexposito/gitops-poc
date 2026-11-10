@@ -1,0 +1,33 @@
+# Defaults. Each app overrides these in kargo/apps/<app>.yaml - see
+# kargo/apps/pulse-api.yaml for a complete example.
+
+# Kargo Project name: the app's namespace on management, and the prefix of
+# the Argo CD apps' kargo.akuity.io/authorized-stage annotation.
+project: ""
+# apps/<app>/overlays/<stage> in this repo, Argo CD apps <app>-<stage>, and
+# the namespace on each workload cluster.
+app: ""
+# Argo CD AppProject the <app>-<stage> Applications belong to.
+argocdProject: ""
+# The app image; the Warehouse picks up its sha-<short> tags.
+image: ""
+# The app's e2e test image, pushed with the same sha-<short> tag.
+e2eImage: ""
+# NodePort the app listens on in every workload cluster; e2e hits
+# http://k3s-<stage>:<port>.
+port: 30080
+# Promotion order. Each stage takes Freight verified in the one before it;
+# the first takes it straight from the Warehouse.
+stages: [internal, stg, prod]
+# Stages promoted automatically. Anything else waits for Promote in the UI.
+autoPromote: [internal, stg]
+# Shared ClusterAnalysisTemplates (kargo/shared/) to verify with - every one
+# listed must pass. Either one list for all stages:
+#   verification: [e2e-basic]
+# or per stage (a stage left out isn't verified):
+#   verification:
+#     internal: [e2e-basic]
+#     stg: [e2e-basic, e2e-playwright]
+verification: [e2e-basic]
+# Tag filter for both images - matches docker/metadata-action's type=sha.
+tagRegex: ^sha-[0-9a-f]{7}$

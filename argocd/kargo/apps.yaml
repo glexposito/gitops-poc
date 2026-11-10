@@ -1,0 +1,55 @@
+# One Kargo pipeline per app: every kargo/apps/<app>.yaml becomes an
+# Application (kargo-<project>) rendering kargo/chart with that file as its
+# values - the app's Kargo Project, Warehouse and Stages on management.
+# Adding an app to Kargo is adding that one file.
+#
+# The Argo CD Applications Kargo promotes into (<app>-<stage>) come from
+# the same files, via argocd/appsets/kargo-apps-workloads.yaml.
+#
+# SkipDryRunOnMissingResource + retry: on a fresh cluster Kargo's CRDs
+# don't exist until argocd/kargo/install.yaml has synced.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kargo-apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/glexposito/gitops-poc.git
+        revision: HEAD
+        files:
+          - path: kargo/apps/*.yaml
+  template:
+    metadata:
+      name: 'kargo-{{ .project }}'
+      namespace: argocd
+      labels:
+        layer: promotion
+    spec:
+      project: kargo
+      source:
+        repoURL: https://github.com/glexposito/gitops-poc.git
+        targetRevision: HEAD
+        path: kargo/chart
+        helm:
+          releaseName: '{{ .project }}'
+          valueFiles:
+            - '../apps/{{ .path.filename }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{ .project }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - SkipDryRunOnMissingResource=true
+        retry:
+          limit: 10
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 5m

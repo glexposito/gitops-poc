@@ -34,9 +34,10 @@ There's no `kubectl` on the host. Each cluster ships its own:
 | `projects/`                     | AppProjects: what each team may deploy, and where       |
 | `appsets/cluster-manifests.yaml`| `manifests/<cluster>/` on every cluster, management too |
 | `appsets/pulse-api.yaml`        | pulse-api on every `role=workload` cluster              |
-| `appsets/pulse-api-kargo.yaml`  | The Kargo copy on every `role=workload` cluster         |
+| `appsets/kargo-apps-workloads.yaml` | `<app>-<stage>` for every `kargo/apps/<app>.yaml` × `role=workload` cluster |
 | `kargo/install.yaml`            | cert-manager, Argo Rollouts, Kargo on management        |
-| `kargo/pulse-api.yaml`          | Syncs `kargo/pulse-api/` (the Kargo pipeline itself)    |
+| `kargo/shared.yaml`             | Syncs `kargo/shared/`: steps and test templates for every app |
+| `kargo/apps.yaml`               | One `kargo/chart` instance per `kargo/apps/<app>.yaml`  |
 
 The ApplicationSets use Argo CD's **clusters generator**: they select
 registered clusters by label instead of listing server URLs. The cluster

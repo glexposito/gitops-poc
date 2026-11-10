@@ -44,7 +44,7 @@ curl localhost:8083/hostname    # pulse-api on prod: which pod answered
 | `argocd/`              | Root app, AppProjects, ApplicationSets        | Yes             |
 | `apps/pulse-api/`      | Kustomize base + one overlay per stage (CI path) | Yes          |
 | `apps/pulse-api-kargo/` | Same app, own overlays + NodePort (Kargo path) | Yes           |
-| `kargo/pulse-api/`     | Kargo Project, Warehouse, Stages, e2e template | Yes            |
+| `kargo/`               | Kargo: shared steps + test templates, per-app chart, one file per app | Yes |
 | `manifests/<cluster>/` | Per-cluster namespaces, quotas, policies, RBAC | Yes            |
 
 ## Tear down

@@ -55,7 +55,7 @@ spec:
       - ServerSideApply=true
 ---
 # Only the controller is used: it runs Kargo's verification AnalysisRuns
-# (kargo/pulse-api/e2e.yaml). pulse-api's Deployments stay Deployments - no
+# (kargo/shared/e2e-*.yaml). pulse-api's Deployments stay Deployments - no
 # Rollout objects needed.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

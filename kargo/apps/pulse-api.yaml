@@ -1,0 +1,13 @@
+# pulse-api's Kargo pipeline - the only per-app Kargo config. Rendered by
+# kargo/chart (defaults and every option: kargo/chart/values.yaml) and, for
+# the Argo CD side, by argocd/appsets/kargo-apps-workloads.yaml.
+#
+# Promotes the Kargo copy of pulse-api (apps/pulse-api-kargo, NodePort
+# 30081), side by side with the CI-promoted apps/pulse-api.
+project: pulse-api
+app: pulse-api-kargo
+argocdProject: pulse-api
+image: ghcr.io/glexposito/pulse-api
+e2eImage: ghcr.io/glexposito/pulse-api-e2e
+port: 30081
+verification: [e2e-playwright]

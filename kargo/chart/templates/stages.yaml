@@ -1,0 +1,55 @@
+{{- /*
+One Stage per entry in .Values.stages, chained in that order. Each runs the
+shared ClusterPromotionTask, then the verification templates chosen for it.
+${{ ... }} is Kargo's expression syntax, so it's emitted with printf to keep
+Helm from treating it as a template.
+*/ -}}
+{{- $values := .Values -}}
+{{- range $i, $stage := .Values.stages }}
+{{- $verification := $values.verification }}
+{{- if kindIs "map" $verification }}
+{{- $verification = get $verification $stage | default list }}
+{{- end }}
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: {{ $stage }}
+  namespace: {{ $values.project }}
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: {{ $values.app }}
+      sources:
+        {{- if eq $i 0 }}
+        direct: true
+        {{- else }}
+        stages:
+          - {{ index $values.stages (sub $i 1) }}
+        {{- end }}
+  promotionTemplate:
+    spec:
+      steps:
+        - task:
+            name: promote-kustomize-app
+            kind: ClusterPromotionTask
+          vars:
+            - name: app
+              value: {{ required "app is required" $values.app }}
+            - name: image
+              value: {{ $values.image }}
+  {{- with $verification }}
+  verification:
+    analysisTemplates:
+      {{- range . }}
+      - name: {{ . }}
+        kind: ClusterAnalysisTemplate
+      {{- end }}
+    args:
+      - name: base-url
+        value: http://k3s-{{ $stage }}:{{ $values.port }}
+      - name: e2e-image
+        value: {{ printf "%s@${{ imageFrom('%s').Digest }}" $values.e2eImage $values.e2eImage }}
+  {{- end }}
+{{- end }}

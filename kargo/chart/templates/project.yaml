@@ -1,0 +1,20 @@
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: {{ required "project is required" .Values.project }}
+---
+# Stages in autoPromote take new Freight as soon as it's available to them;
+# the rest wait for a person to click Promote (UI) or run `kargo promote`.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: ProjectConfig
+metadata:
+  name: {{ .Values.project }}
+  namespace: {{ .Values.project }}
+spec:
+  promotionPolicies:
+    {{- range .Values.autoPromote }}
+    - stageSelector:
+        name: {{ . }}
+      autoPromotionEnabled: true
+    {{- else }} []
+    {{- end }}
