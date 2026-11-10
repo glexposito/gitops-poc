@@ -12,4 +12,4 @@ metadata:
     environment: internal
     stage: internal
     cost-center: cc-2000
-    managed-by: k8s-keda-poc
+    managed-by: gitops-poc

@@ -11,4 +11,4 @@ metadata:
     environment: management
     stage: management
     cost-center: cc-1000
-    managed-by: k8s-keda-poc
+    managed-by: gitops-poc

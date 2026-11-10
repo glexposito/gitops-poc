@@ -19,7 +19,7 @@ spec:
     Namespace/quota/RBAC governance and the app-of-apps bootstrap itself.
     Not for the workload itself - see the core-workers project.
   sourceRepos:
-    - https://github.com/glexposito/k8s-keda-poc.git
+    - https://github.com/glexposito/gitops-poc.git
     # KEDA's Helm chart (argocd/keda-appset.yaml) - a Helm repo, not git,
     # since we're installing KEDA's own published chart rather than
     # vendoring it into this repo.

@@ -13,7 +13,7 @@ metadata:
 spec:
   description: core-workers - owns the core-workers namespace on each cluster only.
   sourceRepos:
-    - https://github.com/glexposito/k8s-keda-poc.git
+    - https://github.com/glexposito/gitops-poc.git
   destinations:
     - server: https://k3s-internal:6443
       namespace: 'core-workers'

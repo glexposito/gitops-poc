@@ -33,7 +33,7 @@ spec:
     spec:
       project: platform
       source:
-        repoURL: https://github.com/glexposito/k8s-keda-poc.git
+        repoURL: https://github.com/glexposito/gitops-poc.git
         targetRevision: HEAD
         path: 'manifests/{{cluster}}'
       destination:

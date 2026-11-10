@@ -300,14 +300,14 @@ services:
   # kustomize CLIs the deploy jobs use; runner/entrypoint.sh registers it.
   github-runner:
     build: ./runner
-    image: k8s-keda-poc/github-runner
+    image: gitops-poc/github-runner
     container_name: github-runner
     restart: on-failure
 
     environment:
       RUNNER_REPO: ${RUNNER_REPO:-}
       RUNNER_TOKEN: ${RUNNER_TOKEN:-}
-      RUNNER_NAME: local-k8s-keda-poc
+      RUNNER_NAME: local-gitops-poc
       RUNNER_LABELS: local-k8s
       # Inherited by every job, so workflows never carry Argo CD details.
       # Same PoC-only fixed login as argocd/helmchart.yaml; 30090 is its

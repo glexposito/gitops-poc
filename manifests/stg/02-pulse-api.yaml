@@ -10,7 +10,7 @@ metadata:
     environment: stg
     stage: stg
     cost-center: cc-2000
-    managed-by: k8s-keda-poc
+    managed-by: gitops-poc
 ---
 # 2 replica(s) (apps/pulse-api/overlays/stg) + 1 surge pod during a rollout, with
 # headroom to spare - pulse-api is a tiny static Rust binary.

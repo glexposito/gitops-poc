@@ -1,4 +1,4 @@
-# k8s-keda-poc
+# gitops-poc
 
 A throwaway local GitOps playground: four k3s clusters in Docker, one Argo CD
 managing internal/stg/prod, KEDA autoscaling queue workers, and a pipeline

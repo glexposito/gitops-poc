@@ -43,7 +43,7 @@ spec:
     spec:
       project: core-workers
       source:
-        repoURL: https://github.com/glexposito/k8s-keda-poc.git
+        repoURL: https://github.com/glexposito/gitops-poc.git
         targetRevision: HEAD
         path: 'apps/core-workers/overlays/{{stage}}'
         kustomize:

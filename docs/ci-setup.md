@@ -41,7 +41,7 @@ gh api -X PUT repos/glexposito/pulse-api/actions/permissions/fork-pr-contributor
 ```bash
 d=$(mktemp -d)
 ssh-keygen -q -t ed25519 -N "" -f "$d/gitops_key" -C "pulse-api pipeline"
-gh repo deploy-key add "$d/gitops_key.pub" -R glexposito/k8s-keda-poc --allow-write -t "pulse-api pipeline"
+gh repo deploy-key add "$d/gitops_key.pub" -R glexposito/gitops-poc --allow-write -t "pulse-api pipeline"
 gh secret set GITOPS_SSH_KEY -R glexposito/pulse-api < "$d/gitops_key"
 rm -rf "$d"
 ```
@@ -69,9 +69,9 @@ gh run watch -R glexposito/pulse-api
 ## Revoke
 
 ```bash
-gh repo deploy-key delete <id> -R glexposito/k8s-keda-poc        # ids: gh repo deploy-key list
+gh repo deploy-key delete <id> -R glexposito/gitops-poc        # ids: gh repo deploy-key list
 gh api -X DELETE repos/glexposito/pulse-api/actions/runners/<id> # ids: …/actions/runners
-docker compose rm -sf github-runner && docker volume rm k8s-keda-poc_github-runner-state
+docker compose rm -sf github-runner && docker volume rm gitops-poc_github-runner-state
 ```
 
 ## Troubleshooting
