@@ -8,7 +8,7 @@
 # name update and sync this Application - without it Kargo refuses to
 # touch it.
 #
-# Manual sync, like the CI-promoted apps: Kargo's argocd-update step syncs
+# Manual sync: Kargo's argocd-update step syncs
 # each one to the exact commit it pushed by setting targetRevision to that
 # SHA. ignoreApplicationDifferences keeps this ApplicationSet from resetting
 # that pin back to HEAD on its next reconcile.

@@ -1,5 +1,5 @@
 # Shared by every stage. overlays/<stage> only pins the image digest that
-# stage runs - bumped by pulse-api's CI pipeline, one stage at a time.
+# stage runs - promoted by Kargo, one stage at a time.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

@@ -33,7 +33,6 @@ There's no `kubectl` on the host. Each cluster ships its own:
 | `root-app.yaml`                 | App of apps: syncs everything else in `argocd/`         |
 | `projects/`                     | AppProjects: what each team may deploy, and where       |
 | `appsets/cluster-manifests.yaml`| `manifests/<cluster>/` on every cluster, management too |
-| `appsets/pulse-api.yaml`        | pulse-api on every `role=workload` cluster              |
 | `appsets/kargo-apps-workloads.yaml` | `<app>-<stage>` for every `kargo/apps/<app>.yaml` × `role=workload` cluster |
 | `kargo/install.yaml`            | cert-manager, Argo Rollouts, Kargo on management        |
 | `kargo/shared.yaml`             | Syncs `kargo/shared/`: steps and test templates for every app |
@@ -51,8 +50,7 @@ registered cluster can't receive a workload until its project allows it.
 
 | Namespace   | Clusters            | Notes                         |
 | ----------- | ------------------- | ----------------------------- |
-| `pulse-api` | internal, stg, prod | Promoted by pulse-api's CI pipeline |
-| `pulse-api-kargo` | internal, stg, prod | Promoted by Kargo |
+| `pulse-api` | internal, stg, prod | Promoted by Kargo |
 | `argocd`    | management          | Argo CD |
 | `kargo`, `cert-manager`, `argo-rollouts` | management | Kargo and its dependencies |
 | `pulse-api` | management          | The Kargo Project: Warehouse, Stages, e2e Jobs |
@@ -63,11 +61,10 @@ NetworkPolicy (`manifests/<cluster>/00-pulse-api.yaml`), sized per stage.
 ## Promotion (pulse-api)
 
 A Rust API (`apps/pulse-api`, 1/2/3 replicas on internal/stg/prod). Every
-overlay pins an exact image digest. pulse-api's pipeline builds the image
-once, then for each stage it commits the new digest to that stage's
-overlay, runs `argocd app sync` to that exact commit, and runs e2e before
-moving on. The pulse-api Applications have auto-sync off for that reason.
-See [ci-setup.md](ci-setup.md).
-
-Kargo promotes the same builds a second way, into `pulse-api-kargo`: see
-[kargo.md](kargo.md).
+overlay pins an exact image digest. pulse-api's pipeline only builds: it
+pushes the app image and its Playwright e2e image with the same `sha-*` tag.
+Kargo then promotes that build stage by stage: it commits the new digest to
+the stage's overlay, syncs `pulse-api-<stage>` to exactly that commit, and
+runs the e2e image against that deployment before the next stage may take
+it. The pulse-api Applications have auto-sync off, so only a promotion
+deploys them. See [kargo.md](kargo.md).

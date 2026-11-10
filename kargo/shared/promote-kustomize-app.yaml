@@ -1,11 +1,11 @@
 # The promotion steps every app shares - defined once, cluster-wide, and
 # called by each app's Stages (kargo/chart/templates/stages.yaml) with the
-# app's own vars. The same job pulse-api's CI deploy.yml does, run by Kargo:
+# app's own vars:
 #
 #   1. clone gitops-poc, pin the Freight's image digest in
 #      apps/<app>/overlays/<stage>, commit, push
 #   2. argocd-update: pin Argo CD app <app>-<stage> to exactly that commit
-#      and sync it (CI does the same with `argocd app sync --revision`)
+#      and sync it
 #
 # Changing this changes every app's promotion at once.
 #
@@ -55,6 +55,6 @@ spec:
                 # main), not the local one.
                 desiredRevision: ${{ task.outputs['push'].commit }}
                 # Pins the Application's targetRevision to that commit, so a
-                # later push to main (another app, or the CI path) can't be
+                # later push to main (e.g. another app's promotion) can't be
                 # what gets synced and health-checked.
                 updateTargetRevision: true

@@ -2,9 +2,9 @@
 #
 # images: pins an exact digest, never a tag - starts on the image built
 # from glexposito/pulse-api@247711f (tag sha-247711f).
-# pulse-api's CI pipeline then replaces the digest: here (kustomize edit set
-# image) once the previous stage's e2e checks pass - don't hand-edit it
-# unless you mean to deploy (or roll back).
+# Kargo (kargo/shared/promote-kustomize-app.yaml) then replaces the
+# digest here once the build passed the previous stage's e2e.
+# Don't hand-edit it unless you mean to deploy (or roll back).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

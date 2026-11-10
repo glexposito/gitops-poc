@@ -1,6 +1,6 @@
 # The local stand-in for real cluster infrastructure (what Terraform/
 # Terragrunt would provision): four k3s clusters, Argo CD on management,
-# the one-shot bootstrap, and the self-hosted GitHub runner. Kargo is not a
+# and the one-shot bootstrap. Kargo is not a
 # Compose service: Argo CD installs it on management (argocd/kargo/).
 #
 # Nothing in cluster/ is read by Argo CD - everything it syncs lives outside
@@ -34,7 +34,6 @@ services:
     ports:
       - "6444:6443"
       - "8081:30080"   # pulse-api NodePort (apps/pulse-api/base/service.yaml)
-      - "8091:30081"   # pulse-api-kargo NodePort (apps/pulse-api-kargo/base)
     volumes:
       - internal-data:/var/lib/rancher/k3s
       - internal-kubeconfig:/etc/rancher/k3s
@@ -53,7 +52,6 @@ services:
     ports:
       - "6446:6443"
       - "8082:30080"
-      - "8092:30081"
     volumes:
       - stg-data:/var/lib/rancher/k3s
       - stg-kubeconfig:/etc/rancher/k3s
@@ -70,7 +68,6 @@ services:
     ports:
       - "6445:6443"
       - "8083:30080"
-      - "8093:30081"
     volumes:
       - prod-data:/var/lib/rancher/k3s
       - prod-kubeconfig:/etc/rancher/k3s
@@ -125,33 +122,6 @@ services:
     networks:
       - k8s-management
 
-  # Self-hosted GitHub Actions runner for pulse-api's deploy jobs. It only
-  # dials OUT to GitHub, so nothing here is exposed - but its jobs run on
-  # k8s-management, so they reach Argo CD (k3s-management:30090) and each
-  # cluster's NodePort by hostname. Registers once with a one-hour
-  # RUNNER_TOKEN from a gitignored .env (copy .env.example); without one it
-  # logs that and exits, so `docker compose up -d` works anywhere.
-  # Never register it against a public repo that accepts fork PRs without
-  # approval: their code would run here. See docs/ci-setup.md.
-  github-runner:
-    build: ./runner
-    image: gitops-poc/github-runner
-    container_name: github-runner
-    restart: on-failure
-    environment:
-      RUNNER_REPO: ${RUNNER_REPO:-}
-      RUNNER_TOKEN: ${RUNNER_TOKEN:-}
-      RUNNER_NAME: local-gitops-poc
-      RUNNER_LABELS: local-k8s
-      # Inherited by every job, so workflows never carry Argo CD details.
-      # Same PoC-only fixed login as argocd-install.yaml.
-      ARGOCD_SERVER: k3s-management:30090
-      ARGOCD_PASSWORD: "123"
-    volumes:
-      - github-runner-state:/runner-state
-    networks:
-      - k8s-management
-
 volumes:
   internal-data:
   stg-data:
@@ -161,7 +131,6 @@ volumes:
   stg-kubeconfig:
   prod-kubeconfig:
   management-kubeconfig:
-  github-runner-state:
 
 networks:
   k8s-management:

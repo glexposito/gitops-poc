@@ -15,7 +15,7 @@ spec:
       containers:
         - name: pulse-api
           # No tag here - every overlay pins its own exact digest (images:),
-          # bumped by the pipeline stage by stage.
+          # promoted by Kargo stage by stage.
           image: ghcr.io/glexposito/pulse-api
           imagePullPolicy: IfNotPresent
           ports:

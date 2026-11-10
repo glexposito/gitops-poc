@@ -10,9 +10,9 @@ and the [Kubernetes guide](https://kubernetes.io/docs/tasks/manage-kubernetes-ob
 2. **Use a built-in field when one exists:** `images:`, `replicas:`,
    `namespace:`, `labels:`, `namePrefix`/`nameSuffix`,
    `configMapGenerator`/`secretGenerator`.
-3. **CI-promoted images:** the base has the image with no tag. Each overlay
-   has an `images:` entry, and CI pins its digest with
-   `kustomize edit set image`. Never put a promoted image in a patch, because
+3. **Promoted images:** the base has the image with no tag. Each overlay
+   has an `images:` entry, and Kargo pins its digest with its
+   `kustomize-set-image` step. Never put a promoted image in a patch, because
    no tool would update it.
 4. **Use patches only when no field fits**, one concern per file, named
    after it (`app_env.yaml`, `resources.yaml`). Prefer strategic merge.

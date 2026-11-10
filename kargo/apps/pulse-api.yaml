@@ -2,12 +2,13 @@
 # kargo/chart (defaults and every option: kargo/chart/values.yaml) and, for
 # the Argo CD side, by argocd/appsets/kargo-apps-workloads.yaml.
 #
-# Promotes the Kargo copy of pulse-api (apps/pulse-api-kargo, NodePort
-# 30081), side by side with the CI-promoted apps/pulse-api.
+# Kargo promotes apps/pulse-api (Argo CD apps pulse-api-<stage>, NodePort
+# 30080) internal -> stg -> prod, and verifies each stage by running the
+# build's Playwright image against that deployment.
 project: pulse-api
-app: pulse-api-kargo
+app: pulse-api
 argocdProject: pulse-api
 image: ghcr.io/glexposito/pulse-api
 e2eImage: ghcr.io/glexposito/pulse-api-e2e
-port: 30081
+port: 30080
 verification: [e2e-playwright]

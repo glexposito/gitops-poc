@@ -43,8 +43,8 @@ spec:
 ---
 # pulse-api is an API: besides same-namespace
 # traffic, it accepts its HTTP port from anywhere, so the NodePort
-# (30080) is reachable - that's what the github-runner Compose service
-# hits for the pipeline's e2e checks.
+# (30080) is reachable - that's what Kargo's e2e verification Job on
+# management hits.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
