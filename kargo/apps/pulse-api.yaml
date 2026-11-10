@@ -12,3 +12,5 @@ image: ghcr.io/glexposito/pulse-api
 e2eImage: ghcr.io/glexposito/pulse-api-e2e
 port: 30080
 verification: [e2e-playwright]
+# Promote all the way to prod after the prior stage's verification passes.
+autoPromote: [internal, stg, prod]
